@@ -1,0 +1,16 @@
+name = "smartwms"
+compatibility_date = "2024-09-01"
+
+# Cloudflare Pages 构建产物目录（需与 Cloudflare Pages 面板中的 Build output directory 一致）
+pages_build_output_dir = "./dist"
+
+# 绑定 Cloudflare D1 数据库 wms-db
+[[d1_databases]]
+binding = "DB"                             # 在代码中通过 c.env.DB 访问
+database_name = "wms-db"
+database_id = "df60d091-25e4-4137-82df-cb9f2b666ee7"
+
+# 绑定 R2 存储桶（物料图片）
+[[r2_buckets]]
+binding = "R2_BUCKET"
+bucket_name = "wms"

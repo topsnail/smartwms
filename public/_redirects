@@ -1,0 +1,3 @@
+# SPA 路由回退：非 /api 路径统一返回 index.html
+# /api/* 由 Cloudflare Pages Functions 处理，不受此规则影响
+/*    /index.html   200

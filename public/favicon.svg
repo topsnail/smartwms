@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="960" viewBox="0 0 960 960">
+  <defs>
+    <style>
+      .warehouse-outline { stroke: #000000; stroke-width: 24; stroke-linecap: round; stroke-linejoin: round; fill: none; }
+      .box-fill { fill: #F7941D; }
+      .box-outline { stroke: #000000; stroke-width: 24; stroke-linecap: round; stroke-linejoin: round; fill: none; }
+    </style>
+  </defs>
+
+  <!-- 左侧货架 -->
+  <line class="warehouse-outline" x1="120" y1="180" x2="120" y2="780"/>
+  <line class="warehouse-outline" x1="260" y1="180" x2="260" y2="780"/>
+  <line class="warehouse-outline" x1="560" y1="180" x2="560" y2="480"/>
+  
+  <line class="warehouse-outline" x1="120" y1="220" x2="560" y2="220"/>
+  <line class="warehouse-outline" x1="120" y1="340" x2="560" y2="340"/>
+  <line class="warehouse-outline" x1="120" y1="460" x2="500" y2="460"/>
+  <line class="warehouse-outline" x1="120" y1="580" x2="500" y2="580"/>
+  <line class="warehouse-outline" x1="120" y1="700" x2="260" y2="700"/>
+  
+  <line class="warehouse-outline" x1="120" y1="220" x2="260" y2="340"/>
+  <line class="warehouse-outline" x1="120" y1="340" x2="260" y2="460"/>
+  <line class="warehouse-outline" x1="120" y1="460" x2="260" y2="580"/>
+  <line class="warehouse-outline" x1="120" y1="580" x2="260" y2="700"/>
+
+  <!-- 货架上层箱子 -->
+  <rect class="box-fill" x="280" y="200" width="140" height="120"/>
+  <rect class="box-outline" x="280" y="200" width="140" height="120"/>
+  
+  <rect class="box-fill" x="420" y="200" width="120" height="120"/>
+  <rect class="box-outline" x="420" y="200" width="120" height="120"/>
+  <path class="box-outline" d="M460 220 L460 240 L480 240 L480 220 Z"/>
+
+  <!-- 货架中层箱子 -->
+  <rect class="box-fill" x="280" y="380" width="60" height="120"/>
+  <rect class="box-outline" x="280" y="380" width="60" height="120"/>
+  
+  <rect class="box-fill" x="340" y="380" width="120" height="120"/>
+  <rect class="box-outline" x="340" y="380" width="120" height="120"/>
+  <path class="box-outline" d="M380 400 L380 420 L400 420 L400 400 Z"/>
+
+  <!-- 右侧托盘 -->
+  <rect class="box-outline" x="660" y="660" width="240" height="120"/>
+  <rect class="box-outline" x="680" y="720" width="80" height="60"/>
+  <rect class="box-outline" x="800" y="720" width="80" height="60"/>
+
+  <!-- 托盘上的箱子 -->
+  <rect class="box-fill" x="660" y="520" width="120" height="120"/>
+  <rect class="box-outline" x="660" y="520" width="120" height="120"/>
+  <path class="box-outline" d="M700 540 L700 560 L720 560 L720 540 Z"/>
+  
+  <rect class="box-fill" x="780" y="520" width="120" height="120"/>
+  <rect class="box-outline" x="780" y="520" width="120" height="120"/>
+  <path class="box-outline" d="M820 540 L820 560 L840 560 L840 540 Z"/>
+  
+  <rect class="box-fill" x="720" y="400" width="120" height="120"/>
+  <rect class="box-outline" x="720" y="400" width="120" height="120"/>
+  <path class="box-outline" d="M760 420 L760 440 L780 440 L780 420 Z"/>
+
+  <!-- 右侧三条横线 -->
+  <line class="warehouse-outline" x1="660" y1="220" x2="900" y2="220"/>
+  <line class="warehouse-outline" x1="660" y1="300" x2="900" y2="300"/>
+</svg>

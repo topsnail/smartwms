@@ -1,0 +1,218 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer base {
+  body {
+    @apply text-slate-900 antialiased bg-slate-50;
+  }
+
+  :root {
+    --wms-surface: #ffffff;
+    --wms-surface-2: #f8fafc; /* slate-50 */
+    --wms-border: #e2e8f0; /* slate-200 */
+    --wms-border-2: #cbd5e1; /* slate-300 */
+    --wms-primary: #4888f0; /* blue-500（更柔和） */
+    --wms-primary-hover: #4f80ea; /* blue-600 */
+    --wms-primary-soft: #eff6ff; /* blue-50 */
+  }
+
+  /* 让 AntD 默认文字颜色与 Tailwind 体系一致 */
+  .ant-typography,
+  .ant-table,
+  .ant-form,
+  .ant-modal,
+  .ant-card {
+    color: inherit;
+  }
+  /* 移动端：增大可点击区域，表格横向滚动 */
+  @media (max-width: 768px) {
+    button, a {
+      min-height: 44px;
+      min-width: 44px;
+    }
+    .ant-table-wrapper {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+  }
+}
+
+@layer components {
+  /* 统一按钮体系 - 简约设计风格 */
+  /* 主按钮：蓝色背景，白色文字 */
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-all select-none bg-blue-500 hover:bg-blue-600 text-white px-3 py-1.5 text-sm shadow-sm hover:shadow;
+    }
+  .btn-primary:disabled {
+    @apply bg-blue-300 cursor-not-allowed shadow-none;
+  }
+
+  /* 次要按钮：白色背景，灰色文字，灰色边框 */
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-all select-none bg-white text-slate-700 border border-slate-200 hover:border-blue-300 hover:text-blue-700 hover:bg-blue-50 px-3 py-1.5 text-sm shadow-sm hover:shadow;
+  }
+  .btn-secondary:disabled {
+    @apply opacity-60 cursor-not-allowed shadow-none;
+  }
+
+  /* 危险按钮：红色系 */
+  .btn-danger {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-all select-none bg-rose-500 hover:bg-rose-600 text-white px-3 py-1.5 text-sm shadow-sm hover:shadow;
+  }
+  .btn-danger:disabled {
+    @apply bg-rose-300 cursor-not-allowed shadow-none;
+  }
+
+  /* 小尺寸按钮 */
+  .btn-secondary-sm {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-all select-none bg-white text-slate-700 border border-slate-200 hover:border-blue-300 hover:text-blue-700 hover:bg-blue-50 px-2.5 py-1 text-xs shadow-sm hover:shadow;
+  }
+  .btn-danger-sm {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-all select-none bg-rose-500 hover:bg-rose-600 text-white px-2.5 py-1 text-xs shadow-sm hover:shadow;
+  }
+  .btn-success-sm {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-all select-none bg-emerald-500 hover:bg-emerald-600 text-white px-2.5 py-1 text-xs shadow-sm hover:shadow;
+  }
+  .btn-success-sm:disabled {
+    @apply bg-emerald-300 cursor-not-allowed shadow-none;
+  }
+
+  /* 图标按钮 */
+  .btn-icon {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-all select-none bg-white text-slate-600 border border-slate-200 hover:border-blue-300 hover:text-blue-700 hover:bg-blue-50 p-1.5 shadow-sm hover:shadow;
+  }
+  .btn-icon:disabled {
+    @apply opacity-60 cursor-not-allowed shadow-none;
+  }
+
+  /* 表格：仅在显式加上 wms-table 类时启用（避免全局影响所有表格布局） */
+  .wms-table.ant-table-wrapper {
+    width: 100%;
+  }
+  .wms-table .ant-table-thead > tr > th,
+  .wms-table .ant-table-tbody > tr > td {
+    min-width: 96px;
+  }
+  .wms-table .ant-table-tbody > tr:nth-child(odd) > td {
+    background-color: #f8fafc;
+  }
+  .wms-table .ant-table-tbody > tr:nth-child(even) > td {
+    background-color: #ffffff;
+  }
+  .wms-table .ant-table-tbody > tr:hover > td {
+    background-color: #e0e7ff !important;
+  }
+
+  /* AntD：灰白基底 + 蓝色点缀（不改变布局，仅统一观感） */
+  .ant-card,
+  .ant-modal-content,
+  .ant-table,
+  .ant-table-container {
+    border-color: var(--wms-border);
+    border-radius: 0.75rem;
+  }
+
+  .ant-card {
+    background: var(--wms-surface);
+    border-radius: 0.75rem;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  }
+
+  .ant-table-wrapper .ant-table-thead > tr > th {
+    background: var(--wms-surface-2);
+    color: #334155; /* slate-700 */
+    border-bottom: 1px solid var(--wms-border);
+    border-radius: 0;
+  }
+
+  .ant-table-wrapper .ant-table-tbody > tr > td {
+    border-bottom: 1px solid rgba(226, 232, 240, 0.9);
+  }
+
+  .ant-table-wrapper .ant-table-tbody > tr:hover > td {
+    background: var(--wms-primary-soft) !important;
+  }
+
+  /* 输入类控件 focus 用蓝色点缀 */
+  .ant-input:focus,
+  .ant-input-focused,
+  .ant-select-focused .ant-select-selector,
+  .ant-picker-focused {
+    border-color: var(--wms-primary) !important;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12) !important;
+  }
+
+  /* AntD 按钮样式统一 */
+  .ant-btn {
+    border-radius: 0.5rem !important;
+    font-weight: 500 !important;
+    transition: all 0.2s ease !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 0.5rem !important;
+  }
+
+  .ant-btn-primary {
+    background-color: var(--wms-primary) !important;
+    border-color: var(--wms-primary) !important;
+    color: white !important;
+    box-shadow: 0 1px 2px 0 rgba(37, 99, 235, 0.4) !important;
+  }
+
+  .ant-btn-primary:hover {
+    background-color: var(--wms-primary-hover) !important;
+    border-color: var(--wms-primary-hover) !important;
+    box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.4) !important;
+  }
+
+  .ant-btn-default {
+    border-color: var(--wms-border) !important;
+    color: #334155 !important;
+    background: #ffffff !important;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
+  }
+  .ant-btn-default:not(:disabled):not(.ant-btn-disabled):hover {
+    border-color: rgba(37, 99, 235, 0.35) !important;
+    color: var(--wms-primary) !important;
+    background: var(--wms-primary-soft) !important;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;
+  }
+
+  .ant-btn-dangerous {
+    background-color: #e11d48 !important;
+    border-color: #e11d48 !important;
+    color: white !important;
+    box-shadow: 0 1px 2px 0 rgba(225, 29, 72, 0.4) !important;
+  }
+
+  .ant-btn-dangerous:hover {
+    background-color: #be123c !important;
+    border-color: #be123c !important;
+    box-shadow: 0 4px 6px -1px rgba(225, 29, 72, 0.4) !important;
+  }
+
+  /* 表格/列表操作区：图标按钮不需要任何背景色（即使是 danger） */
+  .ant-btn.wms-icon-btn {
+    background: transparent !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
+    padding-inline: 6px !important;
+    padding-block: 0 !important;
+    height: auto !important;
+  }
+  .ant-btn.wms-icon-btn:hover {
+    background: transparent !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
+  }
+  .ant-btn.wms-icon-btn.ant-btn-dangerous {
+    color: #e11d48 !important;
+  }
+  .ant-btn.wms-icon-btn:not(.ant-btn-dangerous):hover {
+    color: var(--wms-primary) !important;
+  }
+}
