@@ -435,6 +435,8 @@ app.post("/upload-image", async (c) => {
 });
 
 app.get("/uploads/*", async (c) => {
+  const user = await requireAuthUser(c);
+  if (!user) return c.res;
   const bucket = c.env.R2_BUCKET;
   if (!bucket) return c.notFound();
   const rawPath = new URL(c.req.url).pathname;
@@ -443,7 +445,12 @@ app.get("/uploads/*", async (c) => {
   const obj = await bucket.get(key);
   if (!obj) return c.notFound();
   const ct = obj.httpMetadata?.contentType || "application/octet-stream";
-  return new Response(obj.body, { headers: { "Content-Type": ct } });
+  return new Response(obj.body, {
+    headers: {
+      "Content-Type": ct,
+      "Cache-Control": "public, max-age=31536000, immutable"
+    }
+  });
 });
 
 app.get("/auth/me", async (c) => {
@@ -821,11 +828,13 @@ app.get("/inventory/stock", async (c) => {
   const url = new URL(c.req.url);
   const material_id = url.searchParams.get("material_id");
   const location_id = url.searchParams.get("location_id");
-  if (!material_id || !location_id) return c.json({ success: false, error: { code: "VALIDATION_FAILED", message: "需要 material_id 和 location_id" } }, 400);
+  if (!material_id || !location_id) {
+    return c.json({ error: "需要 material_id 和 location_id" }, 400);
+  }
   const row = await c.env.DB.prepare("SELECT quantity FROM inventory WHERE material_id = ? AND location_id = ?")
     .bind(Number(material_id), Number(location_id))
     .first<{ quantity: number }>();
-  return c.json({ success: true, data: { quantity: row?.quantity ?? 0 } });
+  return c.json({ quantity: row?.quantity ?? 0 });
 });
 
 app.put("/inventory/:materialId/:locationId", async (c) => {
@@ -967,12 +976,6 @@ app.post("/transactions", async (c) => {
       const partner_id = toInt(item?.partner_id, "partner_id", { min: 1, allowNull: true });
       const note = toOptionalTrimmedText(item?.note);
 
-      const current = await c.env.DB.prepare("SELECT quantity FROM inventory WHERE material_id = ? AND location_id = ?").bind(material_id, location_id).first<{ quantity: number }>();
-      if (type === "OUT") {
-        const avail = current?.quantity ?? 0;
-        if (avail < quantity) throw new Error(`库存不足：当前可用 ${avail}，需要 ${quantity}`);
-      }
-
       const insertResult = await c.env.DB.prepare("INSERT INTO transactions (type, material_id, location_id, quantity, operator_id, department_id, recipient_id, partner_id, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
         .bind(type, material_id, location_id, quantity, operator_id ?? null, department_id ?? null, recipient_id ?? null, partner_id ?? null, note ?? null)
         .run();
@@ -983,9 +986,12 @@ app.post("/transactions", async (c) => {
           .bind(material_id, location_id, quantity)
           .run();
       } else {
-        await c.env.DB.prepare("UPDATE inventory SET quantity = quantity - ? WHERE material_id = ? AND location_id = ?")
-          .bind(quantity, material_id, location_id)
+        const result = await c.env.DB.prepare("UPDATE inventory SET quantity = quantity - ? WHERE material_id = ? AND location_id = ? AND quantity >= ?")
+          .bind(quantity, material_id, location_id, quantity)
           .run();
+        if (result.meta.changes === 0) {
+          throw new Error("库存不足：当前库存可能已变化，请刷新后重试");
+        }
       }
       const material = await c.env.DB.prepare("SELECT name FROM materials WHERE id = ?").bind(material_id).first<any>();
       const location = await c.env.DB.prepare("SELECT name FROM locations WHERE id = ?").bind(location_id).first<any>();
@@ -1330,7 +1336,13 @@ function isPrivateIp(ip: string): boolean {
   if (!ip || ip === "未知") return true;
   if (ip.startsWith("127.") || ip === "::1") return true;
   if (ip.startsWith("10.")) return true;
-  if (ip.startsWith("192.168.") || ip.startsWith("172.16.") || ip.startsWith("172.17.") || ip.startsWith("172.18.") || ip.startsWith("172.19.") || ip.startsWith("172.2") || ip.startsWith("172.30.") || ip.startsWith("172.31.")) return true;
+  if (ip.startsWith("192.168.")) return true;
+  // 172.16.0.0/12: 172.16.x.x - 172.31.x.x
+  if (ip.startsWith("172.")) {
+    const parts = ip.split(".");
+    const s2 = Number(parts[1] || "0");
+    if (s2 >= 16 && s2 <= 31) return true;
+  }
   return false;
 }
 
@@ -1340,7 +1352,7 @@ app.get("/ip-geo", async (c) => {
   const ip = c.req.query("ip") || "";
   if (!ip.trim() || isPrivateIp(ip)) return c.json({ ip, location: null });
   try {
-    const url = `http://ip-api.com/json/${encodeURIComponent(ip.trim())}?fields=status,country,regionName,city&lang=zh-CN`;
+    const url = `https://ip-api.com/json/${encodeURIComponent(ip.trim())}?fields=status,country,regionName,city&lang=zh-CN`;
     const res = await fetch(url, { signal: AbortSignal.timeout(3000) });
     const data = (await res.json()) as { status?: string; country?: string; regionName?: string; city?: string };
     if (data?.status !== "success") return c.json({ ip, location: null });
@@ -1355,10 +1367,10 @@ app.get("/ip-geo", async (c) => {
 // --- Operation Logs ---
 
 app.get("/operation-logs", async (c) => {
-  const user = await requireAuthUser(c);
+  const user = await requirePermission(c, "logs_view");
   if (!user) return c.res;
   const url = new URL(c.req.url);
-  const { action, actions, operator, keyword, start_date, end_date, limit, page, pageSize } = Object.fromEntries(url.searchParams);
+  const { action, actions, operator, keyword, client_ip, start_date, end_date, limit, page, pageSize } = Object.fromEntries(url.searchParams);
   let sql = "SELECT id, action, description, operator, old_value, new_value, client_ip, created_at FROM operation_logs WHERE 1=1";
   const params: any[] = [];
   if (action) { sql += " AND action LIKE ?"; params.push("%" + String(action) + "%"); }
@@ -1371,6 +1383,10 @@ app.get("/operation-logs", async (c) => {
     const k = "%" + String(keyword) + "%";
     sql += " AND (description LIKE ? OR old_value LIKE ? OR new_value LIKE ?)";
     params.push(k, k, k);
+  }
+  if (client_ip) {
+    sql += " AND client_ip LIKE ?";
+    params.push("%" + String(client_ip) + "%");
   }
   if (start_date) { sql += " AND created_at >= ?"; params.push(String(start_date)); }
   if (end_date) { sql += " AND created_at <= ?"; params.push(String(end_date) + " 23:59:59"); }

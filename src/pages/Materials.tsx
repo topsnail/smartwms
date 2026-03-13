@@ -435,9 +435,9 @@ export default function Materials() {
       });
     }
 
-    let quality = 0.8;
+    let quality = 0.9;
     let blob = await toBlob(quality);
-    while (blob.size > maxBytes && quality > 0.3) {
+    while (blob.size > maxBytes && quality > 0.5) {
       quality -= 0.1;
       blob = await toBlob(quality);
     }
@@ -968,7 +968,7 @@ export default function Materials() {
               </Upload>
             </Space>
             <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-              开发阶段：图片会保存到本地服务器的 /uploads 目录，字段中自动写入访问地址。
+              上传的图片大小不超过3M。
             </Typography.Text>
           </Form.Item>
         </Form>

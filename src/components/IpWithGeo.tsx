@@ -41,9 +41,8 @@ export function IpWithGeo({ ip, showIp = true }: IpWithGeoProps) {
   }
   if (location) {
     return (
-      <span title={location}>
-        {display}
-        {showIp && " "}
+      <span title={location} className="inline-flex flex-col leading-tight">
+        {display && <span>{display}</span>}
         <span className="text-slate-500 text-xs">{location}</span>
       </span>
     );

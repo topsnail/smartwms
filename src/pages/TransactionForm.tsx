@@ -285,6 +285,10 @@ export default function TransactionForm({ type }: { type: 'IN' | 'OUT' }) {
     if (type === 'OUT') {
       if (!processedFormData.department_id) throw new Error('请选择或输入领用部门');
       if (!processedFormData.recipient_id) throw new Error('请选择或输入领用人');
+      if (!processedFormData.partner_id) throw new Error('请选择或输入往来单位');
+      if (!processedFormData.usage_unit || !String(processedFormData.usage_unit).trim()) {
+        throw new Error('请输入使用单位');
+      }
       if (currentStock !== null && qty > currentStock) {
         throw new Error(`库存不足：当前可用 ${currentStock}，需要 ${processedFormData.quantity}`);
       }

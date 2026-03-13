@@ -7,6 +7,11 @@ function withSecurityHeaders(res: Response): Response {
     "Permissions-Policy",
     "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
   );
+  headers.set(
+    "Content-Security-Policy",
+    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+  );
+  headers.set("Strict-Transport-Security", "max-age=15552000; includeSubDomains");
   return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
 }
 
