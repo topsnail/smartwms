@@ -1,6 +1,7 @@
 import React from "react";
 import { Popover } from "antd";
 import AntdImage from "antd/es/image";
+import { apiClient } from "../api/client";
 
 const Image = AntdImage as any;
 
@@ -14,9 +15,34 @@ export function PreviewImage(props: {
   const { url, name, thumbSize = 40, popoverPreview = false, onClick } = props;
   if (!url) return <span className="text-slate-300 text-xs">无</span>;
 
+  const [resolvedUrl, setResolvedUrl] = React.useState<string>(url);
+
+  React.useEffect(() => {
+    let alive = true;
+    let objectUrl: string | null = null;
+
+    async function run() {
+      setResolvedUrl(url);
+      if (!url.startsWith("/api/uploads/")) return;
+      try {
+        const blob = await apiClient.getBlob(url);
+        objectUrl = URL.createObjectURL(blob);
+        if (alive) setResolvedUrl(objectUrl);
+      } catch {
+        if (alive) setResolvedUrl(url);
+      }
+    }
+
+    run();
+    return () => {
+      alive = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [url]);
+
   const thumb = (
     <Image
-      src={url}
+      src={resolvedUrl}
       alt={name}
       width={thumbSize}
       height={thumbSize}
@@ -31,7 +57,7 @@ export function PreviewImage(props: {
 
   return (
     <Popover
-      content={<Image src={url} alt={name} width={200} style={{ objectFit: "contain" }} preview={false} />}
+      content={<Image src={resolvedUrl} alt={name} width={200} style={{ objectFit: "contain" }} preview={false} />}
     >
       {thumb}
     </Popover>
