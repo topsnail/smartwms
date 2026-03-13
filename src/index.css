@@ -156,6 +156,50 @@
     gap: 0.5rem !important;
   }
 
+  /* AntD：整体字号与控件尺寸下调一档（更贴合左侧导航与内容区密度） */
+  .ant-btn,
+  .ant-input,
+  .ant-input-number,
+  .ant-select,
+  .ant-picker,
+  .ant-table,
+  .ant-form,
+  .ant-modal,
+  .ant-drawer,
+  .ant-message,
+  .ant-notification {
+    font-size: 13px !important;
+  }
+
+  .ant-input,
+  .ant-input-number,
+  .ant-picker,
+  .ant-select-selector {
+    height: 32px !important;
+    padding-block: 0 !important;
+  }
+
+  .ant-input::placeholder,
+  .ant-input-number-input::placeholder {
+    font-size: 12px !important;
+  }
+
+  .ant-btn {
+    font-size: 13px !important;
+    height: 32px !important;
+    padding-inline: 12px !important;
+    padding-block: 0 !important;
+  }
+
+  .ant-btn-lg {
+    height: 36px !important;
+  }
+
+  .ant-btn-sm {
+    height: 28px !important;
+    padding-inline: 10px !important;
+  }
+
   .ant-btn-primary {
     background-color: var(--wms-primary) !important;
     border-color: var(--wms-primary) !important;

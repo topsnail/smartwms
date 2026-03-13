@@ -20,7 +20,6 @@ function withCacheHeaders(req: Request, res: Response): Response {
   const pathname = url.pathname;
   const headers = new Headers(res.headers);
 
-  // Vite 产物通常带 hash，适合长缓存
   if (pathname.startsWith("/assets/")) {
     headers.set("Cache-Control", "public, max-age=31536000, immutable");
   }

@@ -38,14 +38,14 @@ export default function Settings() {
         subtitle="管理仓库的基础配置数据，如库位、单位、人员等。"
       />
 
-      <div className="flex flex-col lg:flex-row gap-8">
+      <div className="flex flex-col lg:flex-row gap-6">
         {/* Sidebar Tabs */}
         <div className="w-full lg:w-64 space-y-1">
           {tabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
+              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
                 activeTab === tab.id 
                   ? "bg-white text-blue-600 shadow-sm border border-slate-200" 
                   : "text-slate-600 hover:bg-white/50"
@@ -59,12 +59,12 @@ export default function Settings() {
 
         {/* Content Area */}
         <div className="flex-1 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-            <h3 className="font-bold text-slate-900">{tabs.find(t => t.id === activeTab)?.name}</h3>
+          <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
+            <h3 className="font-semibold text-slate-900">{tabs.find(t => t.id === activeTab)?.name}</h3>
             {/* 各面板内自带“新增/编辑”交互，避免在 Settings.tsx 中继续膨胀 */}
           </div>
 
-          <div className="p-6">
+          <div className="p-5">
             {activeTab === "import-export" ? (
               <ImportExportPanel />
             ) : activeTab === "staff" ? (

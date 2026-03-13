@@ -3,8 +3,6 @@ import { handle } from "hono/cloudflare-pages";
 import { sign, verify } from "hono/jwt";
 import bcrypt from "bcryptjs";
 
-// Minimal D1 type definitions for TypeScript.
-// At runtime, Cloudflare will provide the actual implementations.
 type D1Result<T = unknown> = {
   results?: T[];
   success: boolean;
@@ -141,24 +139,19 @@ type UserPayload = {
 
 const app = new Hono<Env>().basePath("/api");
 
-// JWT_SECRET 必须由 Cloudflare Pages 环境变量提供（生产环境不允许兜底默认值）
-
 let schemaReady: Promise<void> | null = null;
 async function ensureSchema(db: D1Database) {
   if (!schemaReady) {
     schemaReady = (async () => {
-      // Create partners table if missing
       await db
         .prepare(
           "CREATE TABLE IF NOT EXISTS partners (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE NOT NULL, invoice_info TEXT, contact TEXT, mailing_address TEXT)"
         )
         .run();
 
-      // Add partner_id column to transactions if missing (best-effort)
       try {
         await db.prepare("ALTER TABLE transactions ADD COLUMN partner_id INTEGER").run();
       } catch {
-        // ignore if already exists / not supported
       }
     })();
   }
@@ -170,7 +163,6 @@ function hasPermission(perms: string[] | undefined, required: PermissionKey): bo
   if (perms.includes("*")) return true;
   if (perms.includes(required)) return true;
 
-  // 兼容映射：细粒度权限 -> 旧权限 / 总开关
   if (required === "export") return perms.some((p) => p.startsWith("export_"));
   if (required === "backup") return perms.includes("backup_db");
   if (required === "edit_material")
@@ -182,7 +174,6 @@ function hasPermission(perms: string[] | undefined, required: PermissionKey): bo
   if (required === "inbound") return perms.includes("transactions_inbound");
   if (required === "outbound") return perms.includes("transactions_outbound");
 
-  // 兼容映射：旧权限 -> 细粒度权限
   if (
     required === "export_materials" ||
     required === "export_inventory" ||
@@ -1350,14 +1341,22 @@ app.get("/ip-geo", async (c) => {
   const user = await requireAuthUser(c);
   if (!user) return c.res;
   const ip = c.req.query("ip") || "";
-  if (!ip.trim() || isPrivateIp(ip)) return c.json({ ip, location: null });
-  try {
-    const url = `https://ip-api.com/json/${encodeURIComponent(ip.trim())}?fields=status,country,regionName,city&lang=zh-CN`;
+  const raw = ip.trim();
+  if (!raw || isPrivateIp(raw)) return c.json({ ip, location: null });
+
+  async function queryIpApi(base: "https" | "http") {
+    const url = `${base}://ip-api.com/json/${encodeURIComponent(raw)}?fields=status,country,regionName,city&lang=zh-CN`;
     const res = await fetch(url, { signal: AbortSignal.timeout(3000) });
     const data = (await res.json()) as { status?: string; country?: string; regionName?: string; city?: string };
-    if (data?.status !== "success") return c.json({ ip, location: null });
+    if (data?.status !== "success") return null;
     const parts = [data.country, data.regionName, data.city].filter(Boolean);
-    const location = parts.length ? parts.join(" ") : null;
+    return parts.length ? parts.join(" ") : null;
+  }
+
+  try {
+    // ip-api 免费版通常仅支持 HTTP；这里先尝试 HTTPS，失败则回退 HTTP，保证稳定可用
+    let location = await queryIpApi("https").catch(() => null);
+    if (!location) location = await queryIpApi("http").catch(() => null);
     return c.json({ ip, location });
   } catch {
     return c.json({ ip, location: null });
@@ -1409,7 +1408,6 @@ app.get("/operation-logs", async (c) => {
 app.delete("/operation-logs", async (c) => {
   const user = await requireAuthUser(c);
   if (!user) return c.res;
-  // 仅管理员允许清空所有操作日志（前端按钮也只对 admin 显示）
   if (user.role !== "admin") {
     return c.json({ error: "无权清空操作日志" }, 403);
   }

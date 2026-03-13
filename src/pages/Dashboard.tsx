@@ -127,7 +127,7 @@ export default function Dashboard() {
   ].filter((x) => x.show);
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <PageHeader
         icon={<LayoutDashboard size={22} className="text-blue-500" />}
         title="仪表盘概览"
@@ -142,7 +142,7 @@ export default function Dashboard() {
             <button
               onClick={() => fetchData(true)}
               disabled={refreshing || loading}
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50 transition-colors text-sm font-medium"
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50 transition-colors text-sm font-medium"
             >
               <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} />
               刷新
@@ -169,7 +169,7 @@ export default function Dashboard() {
       ) : stats ? (
         <>
           {/* 统计卡片 */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-5">
             {[
               { title: '总物料数', value: stats.totalMaterials, icon: Package, color: 'text-blue-600', bg: 'bg-blue-50' },
               { title: '当前库存总量', value: stats.totalStock, icon: TrendingUp, color: 'text-emerald-600', bg: 'bg-emerald-50' },
@@ -202,7 +202,7 @@ export default function Dashboard() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.05 }}
-                className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm"
+                className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm"
               >
                 <div className="flex items-center justify-between mb-4">
                   <div className={`p-3 rounded-xl ${card.bg} ${card.color}`}>
@@ -213,7 +213,7 @@ export default function Dashboard() {
                   )}
                 </div>
                 <h3 className="text-slate-500 text-sm font-medium">{card.title}</h3>
-                <p className="text-2xl lg:text-3xl font-bold text-slate-900 mt-1">{card.value}</p>
+                <p className="text-xl lg:text-2xl font-bold text-slate-900 mt-1">{card.value}</p>
               </motion.div>
             ))}
           </div>
@@ -232,11 +232,11 @@ export default function Dashboard() {
             />
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* 库存预警（使用 min_stock，显示与安全库存差距） */}
-            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg font-bold text-slate-900">低库存预警</h3>
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+              <div className="flex items-center justify-between mb-5">
+                <h3 className="text-base font-bold text-slate-900">低库存预警</h3>
                 <Link
                   to="/inventory"
                   className="text-xs font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-1 uppercase tracking-wider"
@@ -283,14 +283,14 @@ export default function Dashboard() {
             </div>
 
             {/* 快捷操作（按权限显示） */}
-            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-              <h3 className="text-lg font-bold text-slate-900 mb-6">快捷操作</h3>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+              <h3 className="text-base font-bold text-slate-900 mb-5">快捷操作</h3>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 {shortcutItems.map((item) => (
                   <Link
                     key={item.to}
                     to={item.to}
-                    className="flex flex-col items-center justify-center p-6 rounded-xl border border-slate-100 hover:bg-slate-50 transition-colors group"
+                    className="flex flex-col items-center justify-center p-4 rounded-xl border border-slate-100 hover:bg-slate-50 transition-colors group"
                   >
                     <div
                       className={`w-12 h-12 rounded-full ${item.bg} ${item.color} flex items-center justify-center mb-3 group-hover:scale-110 transition-transform`}
@@ -305,9 +305,9 @@ export default function Dashboard() {
           </div>
 
           {/* 趋势图 + 有库存库位数 + 往来单位 TOP3 */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-              <h3 className="text-lg font-bold text-slate-900 mb-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+              <h3 className="text-base font-bold text-slate-900 mb-5">
                 近 {timeRange === 'month' ? '30' : '7'} 天出入库趋势
               </h3>
               <div className="flex items-end gap-1 h-32">
@@ -341,14 +341,14 @@ export default function Dashboard() {
               </div>
             </div>
 
-            <div className="space-y-6">
-              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                <h3 className="text-lg font-bold text-slate-900 mb-4">有库存库位数</h3>
-                <p className="text-3xl font-bold text-indigo-600">{stats.locationCount}</p>
+            <div className="space-y-5">
+              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                <h3 className="text-base font-bold text-slate-900 mb-3">有库存库位数</h3>
+                <p className="text-2xl font-bold text-indigo-600">{stats.locationCount}</p>
               </div>
               {stats.partnerTop.length > 0 && (
-                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                  <h3 className="text-lg font-bold text-slate-900 mb-4">本月主要往来单位</h3>
+                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                  <h3 className="text-base font-bold text-slate-900 mb-3">本月主要往来单位</h3>
                   <ul className="space-y-2">
                     {stats.partnerTop.map((p, i) => (
                       <li key={p.name} className="flex justify-between text-sm">
@@ -364,8 +364,8 @@ export default function Dashboard() {
 
           {/* 最近流水 */}
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="flex items-center justify-between p-6 border-b border-slate-100">
-              <h3 className="text-lg font-bold text-slate-900">最近出入库</h3>
+            <div className="flex items-center justify-between p-5 border-b border-slate-100">
+              <h3 className="text-base font-bold text-slate-900">最近出入库</h3>
               <Link
                 to="/history"
                 className="text-xs font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-1 uppercase tracking-wider"
