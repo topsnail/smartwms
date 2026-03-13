@@ -394,30 +394,91 @@ export default function Materials() {
     setImportPreviewRows(null);
   }, []);
 
+  async function compressImageToDataUrl(file: File, maxWidth: number, maxHeight: number, maxBytes: number): Promise<string> {
+    const dataUrl: string = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(reader.error);
+      reader.onload = () => resolve(reader.result as string);
+      reader.readAsDataURL(file);
+    });
+
+    const img: HTMLImageElement = await new Promise((resolve, reject) => {
+      const image = new Image();
+      image.onload = () => resolve(image);
+      image.onerror = (e) => reject(e);
+      image.src = dataUrl;
+    });
+
+    const { width, height } = img;
+    const scale = Math.min(1, maxWidth / width, maxHeight / height);
+    const targetWidth = Math.max(1, Math.round(width * scale));
+    const targetHeight = Math.max(1, Math.round(height * scale));
+
+    const canvas = document.createElement('canvas');
+    canvas.width = targetWidth;
+    canvas.height = targetHeight;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('浏览器不支持 Canvas');
+    ctx.clearRect(0, 0, targetWidth, targetHeight);
+    ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
+
+    async function toBlob(quality: number): Promise<Blob> {
+      return new Promise((resolve, reject) => {
+        canvas.toBlob(
+          (blob) => {
+            if (!blob) return reject(new Error('图片压缩失败'));
+            resolve(blob);
+          },
+          'image/webp',
+          quality,
+        );
+      });
+    }
+
+    let quality = 0.8;
+    let blob = await toBlob(quality);
+    while (blob.size > maxBytes && quality > 0.3) {
+      quality -= 0.1;
+      blob = await toBlob(quality);
+    }
+
+    if (blob.size > maxBytes) {
+      throw new Error('图片过大，无法压缩至指定大小，请选择更小的图片');
+    }
+
+    const finalDataUrl: string = await new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onerror = () => reject(r.error);
+      r.onload = () => resolve(r.result as string);
+      r.readAsDataURL(blob);
+    });
+    return finalDataUrl;
+  }
+
   const handleImageUpload: UploadProps['customRequest'] = useCallback(async (options) => {
     const { file, onError, onSuccess } = options;
     try {
       const f = file as File;
-      const reader = new FileReader();
-      reader.onload = async () => {
-        try {
-          const base64 = reader.result as string;
-          const data = await apiClient.post<{ url?: string }>('/api/upload-image', {
-            filename: f.name,
-            data: base64,
-          });
-          if (data.url) {
-            form.setFieldsValue({ image_url: data.url } as any);
-          }
-          message.success('图片上传成功');
-          onSuccess && onSuccess(data as any);
-        } catch (err: any) {
-          console.error(err);
-          message.error(err?.message || '图片上传失败');
-          onError && onError(err);
+      try {
+        if (f.size > 3 * 1024 * 1024) {
+          throw new Error('原始图片不能超过 3MB');
         }
-      };
-      reader.readAsDataURL(f);
+        const compressedDataUrl = await compressImageToDataUrl(f, 600, 400, 200 * 1024);
+        const webpName = f.name.replace(/\.[^.]+$/, '') + '.webp';
+        const data = await apiClient.post<{ url?: string }>('/api/upload-image', {
+          filename: webpName,
+          data: compressedDataUrl,
+        });
+        if (data.url) {
+          form.setFieldsValue({ image_url: data.url } as any);
+        }
+        message.success('图片上传成功');
+        onSuccess && onSuccess(data as any);
+      } catch (err: any) {
+        console.error(err);
+        message.error(err?.message || '图片上传失败：' + (err?.message || '请尝试选择更小的图片'));
+        onError && onError(err);
+      }
     } catch (err: any) {
       onError && onError(err);
     }

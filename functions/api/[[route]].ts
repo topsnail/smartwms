@@ -424,12 +424,12 @@ app.post("/upload-image", async (c) => {
   }
   const base64 = String(data).includes(",") ? String(data).split(",")[1] : String(data);
   const buf = base64ToArrayBuffer(base64);
-  if (buf.byteLength > 5 * 1024 * 1024) {
-    return c.json({ success: false, error: { code: "VALIDATION_FAILED", message: "图片不能超过 5MB" } }, 400);
+  if (buf.byteLength > 200 * 1024) {
+    return c.json({ success: false, error: { code: "VALIDATION_FAILED", message: "图片不能超过 200KB" } }, 400);
   }
   const ext = (filename.match(/\.(jpg|jpeg|png|gif|webp)$/i) || ["", "jpg"])[1].toLowerCase();
   const safeName = `uploads/${randomHex(12)}.${ext === "jpeg" ? "jpg" : ext}`;
-  const contentType = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", gif: "image/gif", webp: "image/webp" }[ext] || "image/jpeg";
+  const contentType = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", gif: "image/gif", webp: "image/webp" }[ext] || "image/webp";
   await c.env.R2_BUCKET!.put(safeName, buf, { httpMetadata: { contentType } });
   return c.json({ success: true, url: `/api/uploads/${safeName}`, size: buf.byteLength });
 });
@@ -1388,6 +1388,17 @@ app.get("/operation-logs", async (c) => {
   const lim = Math.min(Number(limit || 500) || 500, 1000);
   const { results } = await c.env.DB.prepare(sql + " ORDER BY created_at DESC, id DESC LIMIT ?").bind(...params, lim).all();
   return c.json(results ?? []);
+});
+
+app.delete("/operation-logs", async (c) => {
+  const user = await requireAuthUser(c);
+  if (!user) return c.res;
+  // 仅管理员允许清空所有操作日志（前端按钮也只对 admin 显示）
+  if (user.role !== "admin") {
+    return c.json({ error: "无权清空操作日志" }, 403);
+  }
+  await c.env.DB.prepare("DELETE FROM operation_logs").run();
+  return c.json({ success: true });
 });
 
 // --- Export (CSV) ---
