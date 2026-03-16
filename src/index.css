@@ -112,12 +112,12 @@
   .ant-table,
   .ant-table-container {
     border-color: var(--wms-border);
-    border-radius: 0.625rem;
+    border-radius: 0.5rem; /* 8px */
   }
 
   .ant-card {
     background: var(--wms-surface);
-    border-radius: 0.625rem;
+    border-radius: 0.5rem; /* 8px */
     box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   }
 
@@ -147,7 +147,7 @@
 
   /* AntD 按钮样式统一 */
   .ant-btn {
-    border-radius: 0.5rem !important;
+    border-radius: 0.5rem !important; /* 8px */
     font-weight: 500 !important;
     transition: all 0.2s ease !important;
     display: inline-flex !important;
@@ -171,12 +171,37 @@
     font-size: 13px !important;
   }
 
+  /* 统一表单控件高度（搜索输入框/筛选下拉/日期选择）= 36px */
   .ant-input,
+  .ant-input-affix-wrapper,
   .ant-input-number,
+  .ant-input-number-affix-wrapper,
   .ant-picker,
-  .ant-select-selector {
+  .ant-select .ant-select-selector {
     height: 36px !important;
     padding-block: 0 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+  }
+
+  /* 统一圆角半径 = 8px（输入/选择/日期/数字输入外层） */
+  .ant-input,
+  .ant-input-affix-wrapper,
+  .ant-input-number,
+  .ant-input-number-affix-wrapper,
+  .ant-picker,
+  .ant-select .ant-select-selector {
+    border-radius: 0.5rem !important; /* 8px */
+  }
+
+  /* 让 Select 内部搜索框高度跟随 36px */
+  .ant-select .ant-select-selection-search-input {
+    height: 34px !important;
+  }
+
+  /* InputNumber 内部 input 也跟随高度 */
+  .ant-input-number .ant-input-number-input {
+    height: 34px !important;
   }
 
   .ant-input::placeholder,

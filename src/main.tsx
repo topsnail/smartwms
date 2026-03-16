@@ -22,32 +22,32 @@ createRoot(document.getElementById('root')!).render(
           colorSuccess: '#52c41a',
           colorWarning: '#fa8c16',
           colorError: '#f5222d',
-          borderRadius: 10,
+          borderRadius: 8,
           controlHeight: 36,
           fontSize: 14,
         },
         components: {
           Button: {
-            borderRadius: 10,
+            borderRadius: 8,
             controlHeight: 36,
             paddingInline: 12,
           },
           Input: {
-            borderRadius: 10,
+            borderRadius: 8,
             controlHeight: 36,
           },
           Select: {
-            borderRadius: 10,
+            borderRadius: 8,
             controlHeight: 36,
           },
           Table: {
-            borderRadius: 10,
+            borderRadius: 8,
           },
           Modal: {
-            borderRadiusLG: 10,
+            borderRadiusLG: 8,
           },
           Card: {
-            borderRadiusLG: 10,
+            borderRadiusLG: 8,
           },
         },
       }}
