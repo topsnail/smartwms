@@ -17,13 +17,11 @@ createRoot(document.getElementById('root')!).render(
       locale={zhCN}
       theme={{
         token: {
-          colorPrimary: '#4888f0', // blue-500（降低饱和度/深度）
-          colorPrimaryHover: '#2563eb', // blue-600
-          colorPrimaryActive: '#1d4ed8', // blue-700
-          colorInfo: '#4888f0',
-          colorSuccess: '#16a34a', // green-600
-          colorWarning: '#f59e0b', // amber-500
-          colorError: '#e11d48', // rose-600
+          colorPrimary: '#1890ff',
+          colorInfo: '#1890ff',
+          colorSuccess: '#52c41a',
+          colorWarning: '#fa8c16',
+          colorError: '#f5222d',
           borderRadius: 12,
           controlHeight: 36,
           fontSize: 14,

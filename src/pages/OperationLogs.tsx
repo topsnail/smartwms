@@ -411,10 +411,17 @@ export default function OperationLogs() {
         icon={<FileText size={22} className="text-blue-500" />}
         title="操作日志"
         subtitle="查看系统中物料、出入库、基础设置等关键操作的完整记录。"
+        actions={
+          showExport && (
+            <Button type="primary" icon={<DownloadOutlined />} onClick={handleExport}>
+              导出 CSV
+            </Button>
+          )
+        }
       />
 
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 space-y-4">
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3 sticky top-0 bg-white z-10 pb-2">
           <Select
             allowClear
             placeholder="模块"
@@ -476,9 +483,6 @@ export default function OperationLogs() {
           />
           <Button onClick={fetchLogs}>查询</Button>
           <Button onClick={() => { setActionFilter(null); setActionsFilter([]); setOperatorInput(''); setKeywordInput(''); setClientIpInput(''); setModuleFilter(null); setDateRange([null, null]); }}>重置</Button>
-          {showExport && (
-            <Button type="primary" icon={<DownloadOutlined />} onClick={handleExport}>导出 CSV</Button>
-          )}
           <Popover content={columnVisibilityContent} trigger="click" placement="bottomRight" title={null}>
             <Button icon={<SettingOutlined />}>列显隐</Button>
           </Popover>

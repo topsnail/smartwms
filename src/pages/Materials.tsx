@@ -1,8 +1,8 @@
 import React, { useMemo, useCallback, useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { PlusOutlined, EditOutlined, DeleteOutlined, UploadOutlined, DownloadOutlined, InboxOutlined, SearchOutlined, SettingOutlined } from '@ant-design/icons';
+import { PlusOutlined, EditOutlined, DeleteOutlined, UploadOutlined, DownloadOutlined, InboxOutlined, SearchOutlined } from '@ant-design/icons';
 import { useAuth } from '../contexts/AuthContext';
-import { Button, Input, Table, Tag, Modal, Form, Select, Space, message, Popover, Upload, Typography, InputNumber, Tooltip, Alert, Popconfirm, Skeleton, Empty, Checkbox } from 'antd';
+import { Button, Input, Table, Tag, Modal, Form, Select, Space, message, Upload, Typography, InputNumber, Tooltip, Alert, Popconfirm, Skeleton, Empty, Dropdown, type MenuProps } from 'antd';
 import type { UploadProps } from 'antd';
 import { apiClient } from '../api/client';
 import { Package as PackageIcon } from 'lucide-react';
@@ -32,46 +32,42 @@ const MaterialImage = React.memo(({ url, name, onClick }: { url: string | null; 
   return <PreviewImage url={url} name={name} popoverPreview onClick={onClick} />;
 });
 
-const MaterialActionButtons = React.memo(({ record, onEdit, onDelete, canEdit, canDelete }: {
+const MaterialActionButtons = React.memo(({ record, onEdit, onDelete, onViewStock, canEdit, canDelete }: {
   record: Material;
   onEdit: (record: Material) => void;
   onDelete: (id: number) => Promise<void> | void;
+  onViewStock: (record: Material) => void;
   canEdit: boolean;
   canDelete: boolean;
-}) => (
-  <Space>
-    {canEdit && (
-      <Tooltip title="编辑">
-        <Button
-          type="link"
-          size="small"
-          className="wms-icon-btn"
-          icon={<EditOutlined />}
-          onClick={() => onEdit(record)}
-        />
-      </Tooltip>
-    )}
-    {canDelete && (
-      <Popconfirm
-        title="确定删除该物料？"
-        description="须先将各仓位库存清零（出库等）后才可删除；未清零时系统将拒绝删除。"
-        okText="确定"
-        cancelText="取消"
-        onConfirm={() => onDelete(record.id)}
-      >
-        <Tooltip title="删除">
-          <Button
-            type="link"
-            size="small"
-            danger
-            className="wms-icon-btn"
-            icon={<DeleteOutlined />}
-          />
-        </Tooltip>
-      </Popconfirm>
-    )}
-  </Space>
-));
+}) => {
+  const items: MenuProps['items'] = [
+    {
+      key: 'view',
+      label: '查看库存分布',
+      onClick: () => onViewStock(record),
+    },
+    canEdit && {
+      key: 'edit',
+      label: '编辑',
+      onClick: () => onEdit(record),
+    },
+    canDelete && {
+      key: 'delete',
+      label: <span className="text-red-500">删除</span>,
+      onClick: () => onDelete(record.id),
+    },
+  ].filter(Boolean) as MenuProps['items'];
+
+  if (!items.length) return null;
+
+  return (
+    <Dropdown menu={{ items }} trigger={['click']}>
+      <Button size="small" className="wms-icon-btn">
+        操作
+      </Button>
+    </Dropdown>
+  );
+});
 
 const DEBOUNCE_MS = DEFAULT_DEBOUNCE_MS;
 const PAGE_SIZE_OPTIONS = DEFAULT_PAGE_SIZE_OPTIONS.map((s) => Number(s));
@@ -110,6 +106,7 @@ export default function Materials() {
     defaultKeys: defaultVisibleKeys,
     storageKey: 'materials.visibleColumns',
   });
+  const [advancedOpen, setAdvancedOpen] = useState(false);
 
   // 支持从 URL 读取 keyword，便于从日志/报表联动跳转
   useEffect(() => {
@@ -635,13 +632,14 @@ export default function Materials() {
         title: '操作',
         key: 'actions',
         align: colAlign,
-        width: 100,
+        width: 96,
         fixed: 'right' as const,
         render: (_: unknown, record: Material) => (
           <MaterialActionButtons
             record={record}
             onEdit={handleEdit}
             onDelete={handleDelete}
+            onViewStock={openPreview}
             canEdit={canEdit}
             canDelete={canDelete}
           />
@@ -700,14 +698,26 @@ export default function Materials() {
         subtitle="管理仓库中的所有物料基础信息。"
         actions={
           <>
-            {can('export') && (
-              <Button icon={<DownloadOutlined />} onClick={handleExport}>
-                导出
+            {can('edit_material') && (
+              <Button
+                type="primary"
+                icon={<PlusOutlined />}
+                onClick={() => {
+                  setEditingId(null);
+                  setIsModalOpen(true);
+                }}
+              >
+                新增物料
               </Button>
             )}
             {can('edit_material') && (
               <Button icon={<InboxOutlined />} onClick={() => setIsImportModalOpen(true)}>
                 导入
+              </Button>
+            )}
+            {can('export') && (
+              <Button icon={<DownloadOutlined />} onClick={handleExport}>
+                导出
               </Button>
             )}
             {can('edit_material') && selectedRowKeys.length > 0 && (
@@ -728,29 +738,13 @@ export default function Materials() {
                 </Button>
               </Popconfirm>
             )}
-            {can('edit_material') && (
-              <Button
-                type="primary"
-                icon={<PlusOutlined />}
-                onClick={() => {
-                  setEditingId(null);
-                  setIsModalOpen(true);
-                }}
-              >
-              新增物料
-            </Button>
-            )}
           </>
         }
       />
 
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 overflow-x-auto">
-        <Space
-          wrap
-          style={{ marginBottom: 16, width: '100%', justifyContent: 'space-between' }}
-          className="w-full"
-        >
-          <Space wrap>
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 overflow-x-auto space-y-3">
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <Input
               allowClear
               placeholder="搜索名称、编码、规格、单位、来源..."
@@ -779,31 +773,62 @@ export default function Materials() {
                 ...sources.map((s) => ({ label: s.name, value: s.name })),
               ]}
             />
-            <InputNumber
-              placeholder="购/售价≥"
-              min={0}
-              style={{ width: 110 }}
-              value={priceMin}
-              onChange={(v) => setPriceMin(v ?? undefined)}
-            />
-            <InputNumber
-              placeholder="购/售价≤"
-              min={0}
-              style={{ width: 110 }}
-              value={priceMax}
-              onChange={(v) => setPriceMax(v ?? undefined)}
-            />
             <Button onClick={() => fetchMaterials()} loading={loading}>
               刷新
             </Button>
-          </Space>
-          <ColumnVisibilityPopover
-            allKeys={columnKeysForPopover}
-            visibleKeys={visibleColumnKeys}
-            onToggle={toggleColumn}
-            onReset={resetColumns}
-          />
-        </Space>
+            <ColumnVisibilityPopover
+              allKeys={columnKeysForPopover}
+              visibleKeys={visibleColumnKeys}
+              onToggle={toggleColumn}
+              onReset={resetColumns}
+            />
+          </div>
+
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-slate-500">
+              快速筛选：名称 / 编码 / 分类 / 来源
+            </span>
+            <Button
+              type="link"
+              size="small"
+              className="p-0 h-auto"
+              onClick={() => setAdvancedOpen((v) => !v)}
+            >
+              {advancedOpen ? '收起高级筛选' : '展开高级筛选'}
+            </Button>
+          </div>
+
+          {advancedOpen && (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 border-t border-dashed border-slate-200 pt-3">
+              <InputNumber
+                placeholder="购/售价 ≥"
+                min={0}
+                style={{ width: '100%' }}
+                value={priceMin}
+                onChange={(v) => setPriceMin(v ?? undefined)}
+              />
+              <InputNumber
+                placeholder="购/售价 ≤"
+                min={0}
+                style={{ width: '100%' }}
+                value={priceMax}
+                onChange={(v) => setPriceMax(v ?? undefined)}
+              />
+              <Button
+                onClick={() => {
+                  setFilterCategoryId(null);
+                  setFilterSource(null);
+                  setPriceMin(undefined);
+                  setPriceMax(undefined);
+                  setSearchInput('');
+                }}
+              >
+                重置筛选
+              </Button>
+            </div>
+          )}
+        </div>
+
         {loading ? (
           <div className="py-6 space-y-3">
             <Skeleton active paragraph={{ rows: 1 }} />

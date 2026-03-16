@@ -1,16 +1,17 @@
 import React, { useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { ArrowDownLeft, ArrowUpRight, CheckCircle2, AlertCircle, RotateCcw } from 'lucide-react';
 import { motion } from 'motion/react';
-import { Button, Form, InputNumber, message, Modal, Empty, Select } from 'antd';
+import { Button, Form, InputNumber, message, Modal, Empty, Select, Table, Skeleton } from 'antd';
 import { getStock } from '../api/inventory';
-import { createTransaction, undoTransaction } from '../api/transactions';
+import { createTransaction, undoTransaction, getTransactions, type Transaction } from '../api/transactions';
 import { createMaterial } from '../api/materials';
 import { apiClient } from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
 import { PageHeader } from '../components/PageHeader';
 
 export default function TransactionForm({ type }: { type: 'IN' | 'OUT' }) {
+  const navigate = useNavigate();
   const { can } = useAuth();
   const canInbound = can('inbound') || can('transactions_inbound');
   const canOutbound = can('outbound') || can('outbound_only') || can('transactions_outbound');
@@ -79,6 +80,37 @@ export default function TransactionForm({ type }: { type: 'IN' | 'OUT' }) {
     payload: Parameters<typeof createTransaction>[0];
     summary: string[];
   } | null>(null);
+  const [recentTx, setRecentTx] = React.useState<Transaction[]>([]);
+  const [recentLoading, setRecentLoading] = React.useState(false);
+
+  React.useEffect(() => {
+    setRecentLoading(true);
+    const load = async () => {
+      try {
+        const today = new Date();
+        const end = today.toISOString().slice(0, 10);
+        const startDate = new Date(today);
+        startDate.setDate(today.getDate() - 6);
+        const start = startDate.toISOString().slice(0, 10);
+        const resp = await getTransactions({
+          type,
+          start_date: start,
+          end_date: end,
+          pageSize: 20,
+        });
+        if (Array.isArray(resp)) {
+          setRecentTx(resp);
+        } else {
+          setRecentTx(resp.data || []);
+        }
+      } catch {
+        setRecentTx([]);
+      } finally {
+        setRecentLoading(false);
+      }
+    };
+    load();
+  }, [type]);
 
   React.useEffect(() => {
     const fetchData = async () => {
@@ -384,25 +416,53 @@ export default function TransactionForm({ type }: { type: 'IN' | 'OUT' }) {
   }
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
-      <PageHeader
-        icon={
-          type === 'IN' ? (
-            <ArrowDownLeft size={22} className="text-indigo-500" />
-          ) : (
-            <ArrowUpRight size={22} className="text-orange-500" />
-          )
-        }
-        title={type === 'IN' ? '物料入库' : '物料出库'}
-        subtitle={`请填写以下信息完成${type === 'IN' ? '入库' : '出库'}登记。`}
-        actions={
+    <div className="space-y-6">
+      <div className="max-w-2xl mx-auto space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="inline-flex rounded-full bg-slate-100 p-1">
+            <button
+              type="button"
+              onClick={() => navigate('/inbound')}
+              className={`px-4 py-1.5 text-sm rounded-full transition-colors ${
+                type === 'IN'
+                  ? 'bg-white text-indigo-600 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              入库登记
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate('/outbound')}
+              className={`px-4 py-1.5 text-sm rounded-full transition-colors ${
+                type === 'OUT'
+                  ? 'bg-white text-orange-500 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              出库登记
+            </button>
+          </div>
           <Link to={type === 'IN' ? '/history?type=IN' : '/history?type=OUT'}>
-            <Button type="link">查看最近{type === 'IN' ? '入库' : '出库'}</Button>
+            <Button type="link" size="small">
+              查看全部出入记录
+            </Button>
           </Link>
-        }
-      />
+        </div>
 
-      {status && (
+        <PageHeader
+          icon={
+            type === 'IN' ? (
+              <ArrowDownLeft size={22} className="text-indigo-500" />
+            ) : (
+              <ArrowUpRight size={22} className="text-orange-500" />
+            )
+          }
+          title={type === 'IN' ? '物料入库' : '物料出库'}
+          subtitle={`请填写以下信息完成${type === 'IN' ? '入库' : '出库'}登记。`}
+        />
+
+        {status && (
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -433,9 +493,9 @@ export default function TransactionForm({ type }: { type: 'IN' | 'OUT' }) {
             </Button>
           )}
         </motion.div>
-      )}
+        )}
 
-      <form onSubmit={handleSubmit} className="bg-white p-6 sm:p-8 rounded-2xl border border-slate-200 shadow-sm space-y-6">
+        <form onSubmit={handleSubmit} className="bg-white p-6 sm:p-8 rounded-2xl border border-slate-200 shadow-sm space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-1">
             <label className="text-xs font-bold text-slate-500 uppercase">选择物料</label>
@@ -698,7 +758,74 @@ export default function TransactionForm({ type }: { type: 'IN' | 'OUT' }) {
         >
           {loading ? '处理中...' : `确认提交${type === 'IN' ? '入库' : '出库'}`}
         </Button>
-      </form>
+        </form>
+      </div>
+
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="text-sm font-medium text-slate-900">
+              近期{type === 'IN' ? '入库' : '出库'}流水（近 7 天）
+            </div>
+            <div className="text-xs text-slate-500">
+              仅展示最近 7 天内的{type === 'IN' ? '入库' : '出库'}记录，完整记录请前往「出入记录」页面。
+            </div>
+          </div>
+          <Link to={`/history?type=${type}`}>
+            <Button type="link" size="small">
+              前往出入记录
+            </Button>
+          </Link>
+        </div>
+        {recentLoading ? (
+          <div className="py-4">
+            <Skeleton active paragraph={{ rows: 4 }} />
+          </div>
+        ) : recentTx.length === 0 ? (
+          <Empty description="近 7 天暂无相关出入库记录" />
+        ) : (
+          <Table<Transaction>
+            size="small"
+            rowKey="id"
+            pagination={false}
+            className="wms-table"
+            scroll={{ x: 720, y: 260 }}
+            columns={[
+              {
+                title: '时间',
+                dataIndex: 'timestamp',
+                key: 'timestamp',
+                render: (v: string) => v.replace('T', ' ').slice(0, 16),
+              },
+              {
+                title: '物料',
+                dataIndex: 'material_name',
+                key: 'material_name',
+                ellipsis: true,
+              },
+              {
+                title: '数量',
+                dataIndex: 'quantity',
+                key: 'quantity',
+                align: 'right',
+              },
+              {
+                title: '库位',
+                dataIndex: 'location_name',
+                key: 'location_name',
+                ellipsis: true,
+              },
+              {
+                title: '经办人',
+                dataIndex: 'operator_name',
+                key: 'operator_name',
+                ellipsis: true,
+              },
+            ]}
+            dataSource={recentTx}
+          />
+        )}
+      </div>
 
       <Modal
         title="确认提交"

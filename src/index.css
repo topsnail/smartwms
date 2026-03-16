@@ -14,9 +14,9 @@
     --wms-surface-2: #f8fafc; /* slate-50 */
     --wms-border: #e2e8f0; /* slate-200 */
     --wms-border-2: #cbd5e1; /* slate-300 */
-    --wms-primary: #4888f0; /* blue-500（更柔和） */
-    --wms-primary-hover: #4f80ea; /* blue-600 */
-    --wms-primary-soft: #eff6ff; /* blue-50 */
+    --wms-primary: #1890ff; /* AntD 蓝 */
+    --wms-primary-hover: #1677ff; /* AntD hover */
+    --wms-primary-soft: #e6f4ff; /* AntD fill */
   }
 
   /* 让 AntD 默认文字颜色与 Tailwind 体系一致 */
@@ -204,13 +204,13 @@
     background-color: var(--wms-primary) !important;
     border-color: var(--wms-primary) !important;
     color: white !important;
-    box-shadow: 0 1px 2px 0 rgba(37, 99, 235, 0.4) !important;
+    box-shadow: 0 1px 2px 0 rgba(24, 144, 255, 0.35) !important;
   }
 
   .ant-btn-primary:hover {
     background-color: var(--wms-primary-hover) !important;
     border-color: var(--wms-primary-hover) !important;
-    box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.4) !important;
+    box-shadow: 0 4px 6px -1px rgba(24, 144, 255, 0.35) !important;
   }
 
   .ant-btn-default {
@@ -220,7 +220,7 @@
     box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
   }
   .ant-btn-default:not(:disabled):not(.ant-btn-disabled):hover {
-    border-color: rgba(37, 99, 235, 0.35) !important;
+    border-color: rgba(24, 144, 255, 0.35) !important;
     color: var(--wms-primary) !important;
     background: var(--wms-primary-soft) !important;
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;

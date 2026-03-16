@@ -206,6 +206,7 @@ export default function Inventory() {
       dataIndex: 'location_name',
       key: 'location_name',
       align: colAlign,
+      fixed: 'left',
       render: (text: string) => (
         <Space>
           <EnvironmentOutlined style={{ color: '#1677ff' }} />
@@ -218,6 +219,7 @@ export default function Inventory() {
       dataIndex: 'code',
       key: 'code',
       align: colAlign,
+      fixed: 'left',
       render: (text: string) => (
         <span
           style={{
