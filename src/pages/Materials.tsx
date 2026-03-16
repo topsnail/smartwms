@@ -633,7 +633,6 @@ export default function Materials() {
         key: 'actions',
         align: colAlign,
         width: 96,
-        fixed: 'right' as const,
         render: (_: unknown, record: Material) => (
           <MaterialActionButtons
             record={record}

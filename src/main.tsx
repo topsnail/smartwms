@@ -22,7 +22,7 @@ createRoot(document.getElementById('root')!).render(
           colorSuccess: '#52c41a',
           colorWarning: '#fa8c16',
           colorError: '#f5222d',
-          borderRadius: 12,
+          borderRadius: 10,
           controlHeight: 36,
           fontSize: 14,
         },
@@ -41,13 +41,13 @@ createRoot(document.getElementById('root')!).render(
             controlHeight: 36,
           },
           Table: {
-            borderRadius: 12,
+            borderRadius: 10,
           },
           Modal: {
-            borderRadiusLG: 16,
+            borderRadiusLG: 10,
           },
           Card: {
-            borderRadiusLG: 16,
+            borderRadiusLG: 10,
           },
         },
       }}

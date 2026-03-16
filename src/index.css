@@ -112,12 +112,12 @@
   .ant-table,
   .ant-table-container {
     border-color: var(--wms-border);
-    border-radius: 0.75rem;
+    border-radius: 0.625rem;
   }
 
   .ant-card {
     background: var(--wms-surface);
-    border-radius: 0.75rem;
+    border-radius: 0.625rem;
     box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   }
 
@@ -175,7 +175,7 @@
   .ant-input-number,
   .ant-picker,
   .ant-select-selector {
-    height: 32px !important;
+    height: 36px !important;
     padding-block: 0 !important;
   }
 
@@ -186,7 +186,7 @@
 
   .ant-btn {
     font-size: 13px !important;
-    height: 32px !important;
+    height: 36px !important;
     padding-inline: 12px !important;
     padding-block: 0 !important;
   }
