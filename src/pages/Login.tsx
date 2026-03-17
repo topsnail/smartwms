@@ -2,7 +2,9 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { Package } from 'lucide-react';
+import { Button } from 'antd';
 import { useAuth } from '../contexts/AuthContext';
+import { notifyError } from '../utils/notify';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -19,8 +21,10 @@ export default function Login() {
     try {
       await login(username, password);
       navigate('/');
-    } catch (err: any) {
-      setError(err.message || '登录失败');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : '登录失败';
+      notifyError(msg);
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -70,13 +74,16 @@ export default function Login() {
               {error}
             </div>
           )}
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 !text-white font-medium rounded-xl transition-colors disabled:opacity-60"
+          <Button
+            type="primary"
+            htmlType="submit"
+            loading={loading}
+            block
+            size="large"
+            className="!py-3 !h-auto !rounded-xl !font-medium"
           >
             {loading ? '登录中...' : '登录'}
-          </button>
+          </Button>
         </form>
         <p className="text-xs text-slate-400 mt-6 text-center">
         </p>

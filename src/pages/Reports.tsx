@@ -10,6 +10,7 @@ import { downloadWithAuth } from '../api/download';
 import { BarChart3 } from 'lucide-react';
 import { PageHeader } from '../components/PageHeader';
 import { buildCommonRangePresets } from '../constants/datePresets';
+import { notifyError } from '../utils/notify';
 
 const { RangePicker } = DatePicker;
 const { Option } = Select;
@@ -77,7 +78,7 @@ export default function Reports() {
     const start = overrideRange?.[0] ?? dateRange?.[0];
     const end = overrideRange?.[1] ?? dateRange?.[1];
     if (!start || !end) {
-      message.error('请选择日期范围');
+      notifyError('请选择日期范围');
       return;
     }
     const s = start.format('YYYY-MM-DD');
@@ -92,7 +93,7 @@ export default function Reports() {
       setSummary(data.summary || {});
       setPage(1);
     } catch (error) {
-      message.error('加载报表数据失败');
+      notifyError('加载报表数据失败');
     } finally {
       setLoading(false);
     }
@@ -100,7 +101,7 @@ export default function Reports() {
 
   const handleExport = async () => {
     if (!hasDateRange) {
-      message.error('请选择日期范围');
+      notifyError('请选择日期范围');
       return;
     }
 
@@ -110,8 +111,8 @@ export default function Reports() {
         `${reportTypeLabel}_${startDate}_${endDate}.csv`
       );
       message.success('报表导出成功');
-    } catch (error: any) {
-      message.error(error?.message || '导出报表失败');
+    } catch (error: unknown) {
+      notifyError(error instanceof Error ? error.message : '导出报表失败');
     }
   };
 

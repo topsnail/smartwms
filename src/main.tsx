@@ -23,7 +23,11 @@ createRoot(document.getElementById('root')!).render(
           colorWarning: '#fa8c16',
           colorError: '#f5222d',
           borderRadius: 8,
+          borderRadiusSM: 8,
+          borderRadiusLG: 8,
           controlHeight: 36,
+          controlHeightSM: 36,
+          controlHeightLG: 36,
           fontSize: 14,
         },
         components: {
@@ -36,7 +40,15 @@ createRoot(document.getElementById('root')!).render(
             borderRadius: 8,
             controlHeight: 36,
           },
+          InputNumber: {
+            borderRadius: 8,
+            controlHeight: 36,
+          },
           Select: {
+            borderRadius: 8,
+            controlHeight: 36,
+          },
+          DatePicker: {
             borderRadius: 8,
             controlHeight: 36,
           },

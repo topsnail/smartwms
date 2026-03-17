@@ -1,5 +1,6 @@
 import React from "react";
-import { message } from "antd";
+import { Button, message } from "antd";
+import { notifyError } from "../../utils/notify";
 import { apiClient } from "../../api/client";
 
 type PermissionItem = { key: string; label: string; desc?: string; group: string };
@@ -65,7 +66,7 @@ export function RolePermissionsPanel() {
       setRoles(json.roles || []);
       setPermissionsByRole(json.permissionsByRole || {});
     } catch (e: any) {
-      message.error(e?.message || "加载角色权限失败");
+      notifyError(e?.message || "加载角色权限失败");
     } finally {
       setLoading(false);
     }
@@ -104,7 +105,7 @@ export function RolePermissionsPanel() {
       message.success("角色权限已保存");
       fetchData();
     } catch (e: any) {
-      message.error(e?.message || "保存失败");
+      notifyError(e?.message || "保存失败");
     } finally {
       setSaving(false);
     }
@@ -124,14 +125,9 @@ export function RolePermissionsPanel() {
         <div className="text-sm text-slate-500">
           说明：勾选后会同时影响前端按钮显示与后端接口鉴权。
         </div>
-        <button
-          onClick={save}
-          disabled={saving}
-          className={`btn-primary text-white text-sm ${saving ? "opacity-70 cursor-not-allowed" : ""}`}
-          style={{ color: "#fff" }}
-        >
+        <Button type="primary" size="small" onClick={save} loading={saving}>
           {saving ? "保存中..." : "保存配置"}
-        </button>
+        </Button>
       </div>
 
       <div className="overflow-x-auto border border-slate-200 rounded-xl">
@@ -143,13 +139,9 @@ export function RolePermissionsPanel() {
                 <th key={r} className="text-center p-3 whitespace-nowrap">
                   {ROLE_LABELS[r] || r}
                   <div className="mt-2">
-                    <button
-                      onClick={() => toggleAll(r)}
-                      className="text-xs px-2 py-1 rounded border border-slate-200 hover:bg-white"
-                      title="切换该角色全权限(*)"
-                    >
+                    <Button type="default" size="small" onClick={() => toggleAll(r)} className="!text-xs" title="切换该角色全权限(*)">
                       {permissionsByRole[r]?.includes("*") ? "取消全权限" : "全权限"}
-                    </button>
+                    </Button>
                   </div>
                 </th>
               ))}

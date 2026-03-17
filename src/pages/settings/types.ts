@@ -8,11 +8,12 @@ export type SettingsTabId =
   | "categories"
   | "partners"
   | "accounts"
+  | "role-permissions"
   | "import-export";
 
 export type SimpleNameType = Exclude<
   SettingsTabId,
-  "staff" | "categories" | "partners" | "accounts" | "import-export"
+  "staff" | "categories" | "partners" | "accounts" | "role-permissions" | "import-export"
 >;
 
 export type BaseRow = { id: number; name: string };

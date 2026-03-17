@@ -2,6 +2,7 @@ import React from "react";
 import { Plus, RefreshCw, Shield, Trash2, UserCog } from "lucide-react";
 import { Button, Input, Modal, message } from "antd";
 import { apiClient } from "../../api/client";
+import { notifyError } from "../../utils/notify";
 import type { UserRole, UserRow } from "./types";
 
 const ROLE_LABEL: Record<UserRole, string> = {
@@ -40,7 +41,7 @@ export function AccountsPanel() {
       const json = await apiClient.get<UserRow[]>("/api/users");
       setUsers(Array.isArray(json) ? json.map(normalizeUser) : []);
     } catch (e: any) {
-      message.error(e?.message || "加载账号列表失败");
+      notifyError(e?.message || "加载账号列表失败");
     } finally {
       setLoading(false);
     }
@@ -67,7 +68,7 @@ export function AccountsPanel() {
       setNewPassword("");
       fetchUsers();
     } catch (e: any) {
-      message.error(e?.message || "创建失败");
+      notifyError(e?.message || "创建失败");
     }
   };
 
@@ -77,7 +78,7 @@ export function AccountsPanel() {
       message.success("已更新");
       fetchUsers();
     } catch (e: any) {
-      message.error(e?.message || "更新失败");
+      notifyError(e?.message || "更新失败");
     }
   };
 
@@ -130,7 +131,7 @@ export function AccountsPanel() {
       message.success("密码已重置");
     } catch (e: any) {
       if (String(e?.message) === "cancel") return;
-      message.error(e?.message || "重置失败");
+      notifyError(e?.message || "重置失败");
     }
   };
 
@@ -156,7 +157,7 @@ export function AccountsPanel() {
       fetchUsers();
     } catch (e: any) {
       if (String(e?.message) === "cancel") return;
-      message.error(e?.message || "删除失败");
+      notifyError(e?.message || "删除失败");
     }
   };
 
@@ -167,20 +168,12 @@ export function AccountsPanel() {
           仅管理员可管理登录账号与权限。
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => fetchUsers()}
-            className="btn-secondary text-sm flex items-center gap-2"
-            disabled={loading}
-          >
-            <RefreshCw size={16} /> 刷新
-          </button>
-          <button
-            onClick={() => setIsCreateOpen(true)}
-            className="btn-primary text-white text-sm flex items-center gap-2"
-            style={{ color: "#fff" }}
-          >
-            <Plus size={16} /> 新增账号
-          </button>
+          <Button type="default" size="small" onClick={() => fetchUsers()} disabled={loading} icon={<RefreshCw size={16} />}>
+            刷新
+          </Button>
+          <Button type="primary" size="small" onClick={() => setIsCreateOpen(true)} icon={<Plus size={16} />}>
+            新增账号
+          </Button>
         </div>
       </div>
 
@@ -237,32 +230,15 @@ export function AccountsPanel() {
                 </td>
                 <td className="p-3">
                   <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => resetPassword(u.id)}
-                      className="btn-secondary-sm text-xs flex items-center gap-1"
-                      title="重置密码"
-                    >
-                      <Shield size={14} /> 重置密码
-                    </button>
-                    <button
-                      onClick={() => updateUser(u.id, { disabled: u.disabled ? 0 : 1 })}
-                      className="btn-secondary-sm text-xs flex items-center gap-1"
-                      title={u.disabled ? "启用账号" : "禁用账号"}
-                    >
-                      <UserCog size={14} /> {u.disabled ? "启用" : "禁用"}
-                    </button>
-                    <button
-                      onClick={() => deleteUser(u)}
-                      disabled={String(u.username || "").toLowerCase() === "admin"}
-                      className={`text-xs flex items-center gap-1 ${
-                        String(u.username || "").toLowerCase() === "admin"
-                          ? "btn-secondary-sm opacity-60 cursor-not-allowed"
-                          : "btn-danger-sm"
-                      }`}
-                      title="删除账号"
-                    >
-                      <Trash2 size={14} /> 删除
-                    </button>
+                    <Button type="default" size="small" onClick={() => resetPassword(u.id)} title="重置密码" icon={<Shield size={14} />} className="!text-xs">
+                      重置密码
+                    </Button>
+                    <Button type="default" size="small" onClick={() => updateUser(u.id, { disabled: u.disabled ? 0 : 1 })} title={u.disabled ? "启用账号" : "禁用账号"} icon={<UserCog size={14} />} className="!text-xs">
+                      {u.disabled ? "启用" : "禁用"}
+                    </Button>
+                    <Button type="primary" danger size="small" onClick={() => deleteUser(u)} disabled={String(u.username || "").toLowerCase() === "admin"} title="删除账号" icon={<Trash2 size={14} />} className="!text-xs">
+                      删除
+                    </Button>
                   </div>
                 </td>
               </tr>
@@ -283,9 +259,7 @@ export function AccountsPanel() {
           <div className="bg-white rounded-2xl w-full max-w-md shadow-xl overflow-hidden">
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
               <h3 className="text-lg font-bold text-slate-900">新增账号</h3>
-              <button onClick={() => setIsCreateOpen(false)} className="text-slate-400 hover:text-slate-600">
-                <Plus size={24} className="rotate-45" />
-              </button>
+              <Button type="text" size="small" onClick={() => setIsCreateOpen(false)} className="!text-slate-400 hover:!text-slate-600" icon={<Plus size={24} className="rotate-45" />} />
             </div>
             <form onSubmit={createUser} className="p-6 space-y-4">
               <div className="space-y-1">
@@ -333,19 +307,12 @@ export function AccountsPanel() {
                 />
               </div>
               <div className="pt-4 flex gap-3">
-                <button
-                  type="button"
-                  onClick={() => setIsCreateOpen(false)}
-                  className="btn-secondary flex-1 text-sm"
-                >
+                <Button type="default" className="flex-1" onClick={() => setIsCreateOpen(false)}>
                   取消
-                </button>
-                <button
-                  type="submit"
-                  className="btn-primary text-white flex-1 text-sm"
-                >
+                </Button>
+                <Button type="primary" htmlType="submit" className="flex-1">
                   创建
-                </button>
+                </Button>
               </div>
             </form>
           </div>

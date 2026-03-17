@@ -15,6 +15,7 @@ import { PageHeader } from '../components/PageHeader';
 import { IpWithGeo } from '../components/IpWithGeo';
 import { buildCommonRangePresets } from '../constants/datePresets';
 import { parseUtc } from '../utils/date';
+import { notifyError } from '../utils/notify';
 import { ACTION_LABELS, FIELD_LABELS, PERMISSION_LABELS, ROLE_LABELS } from '../constants/operationLogLabels';
 
 function formatActionLabel(action: string): string {
@@ -199,7 +200,7 @@ export default function OperationLogs() {
       })
       .catch((err) => {
         console.error(err);
-        message.error('加载操作日志失败，请稍后重试');
+        notifyError('加载操作日志失败，请稍后重试');
       })
       .finally(() => setLoading(false));
   }, [actionFilter, actionsFilter, operatorFilter, keywordFilter, clientIpFilter, moduleFilter, dateRange, page, pageSize]);
@@ -240,7 +241,7 @@ export default function OperationLogs() {
       );
       message.success('导出成功');
     } catch (err: any) {
-      message.error(err?.message || '导出失败');
+      notifyError(err?.message || '导出失败');
     }
   };
 
@@ -500,7 +501,7 @@ export default function OperationLogs() {
                   setPage(1);
                   fetchLogs();
                 } catch (err: any) {
-                  message.error(err?.message || '清空失败');
+                  notifyError(err?.message || '清空失败');
                 }
               }}
             >

@@ -1,8 +1,8 @@
 import React from 'react';
 import { MapPin, Ruler, Users, Building2, Package, Download, Handshake, KeyRound, SlidersHorizontal, Settings as SettingsIcon } from 'lucide-react';
-import { message } from 'antd';
+import { Button } from 'antd';
 import { useAuth } from '../contexts/AuthContext';
-import type { SettingsTabId } from './settings/types';
+import type { SettingsTabId, SimpleNameType } from './settings/types';
 import { PageHeader } from '../components/PageHeader';
 import { SimpleNamePanel } from './settings/SimpleNamePanel';
 import { StaffPanel } from './settings/StaffPanel';
@@ -42,18 +42,18 @@ export default function Settings() {
         {/* Sidebar Tabs */}
         <div className="w-full lg:w-64 space-y-1">
           {tabs.map((tab) => (
-            <button
+            <Button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
-              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                activeTab === tab.id 
-                  ? "bg-white text-blue-600 shadow-sm border border-slate-200" 
-                  : "text-slate-600 hover:bg-white/50"
+              type={activeTab === tab.id ? 'primary' : 'text'}
+              block
+              onClick={() => setActiveTab(tab.id)}
+              className={`!justify-start !h-auto py-2.5 px-4 rounded-xl text-sm font-medium ${
+                activeTab === tab.id ? '!bg-white !text-blue-600 shadow-sm border border-slate-200' : '!text-slate-600 hover:!bg-white/50'
               }`}
+              icon={<tab.icon size={18} />}
             >
-              <tab.icon size={18} />
               {tab.name}
-            </button>
+            </Button>
           ))}
         </div>
 
@@ -78,7 +78,7 @@ export default function Settings() {
             ) : activeTab === "role-permissions" ? (
               <RolePermissionsPanel />
             ) : (
-              <SimpleNamePanel type={activeTab as any} />
+              <SimpleNamePanel type={activeTab as SimpleNameType} />
             )}
           </div>
         </div>

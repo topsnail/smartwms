@@ -5,10 +5,12 @@ import { motion } from 'motion/react';
 import { Button, Form, InputNumber, message, Modal, Empty, Select, Table, Skeleton } from 'antd';
 import { getStock } from '../api/inventory';
 import { createTransaction, undoTransaction, getTransactions, type Transaction } from '../api/transactions';
-import { createMaterial } from '../api/materials';
+import { createMaterial, type Material } from '../api/materials';
 import { apiClient } from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
 import { PageHeader } from '../components/PageHeader';
+import { notifyError } from '../utils/notify';
+import type { BaseRow, StaffRow, PartnerRow } from './settings/types';
 
 export default function TransactionForm({ type }: { type: 'IN' | 'OUT' }) {
   const navigate = useNavigate();
@@ -17,12 +19,12 @@ export default function TransactionForm({ type }: { type: 'IN' | 'OUT' }) {
   const canOutbound = can('outbound') || can('outbound_only') || can('transactions_outbound');
   const canUndo = can('transactions_undo');
   const hasPermission = type === 'IN' ? canInbound : canOutbound;
-  const [materials, setMaterials] = React.useState<any[]>([]);
-  const [locations, setLocations] = React.useState<any[]>([]);
-  const [staff, setStaff] = React.useState<any[]>([]);
-  const [departments, setDepartments] = React.useState<any[]>([]);
-  const [reasons, setReasons] = React.useState<any[]>([]);
-  const [partners, setPartners] = React.useState<any[]>([]);
+  const [materials, setMaterials] = React.useState<Material[]>([]);
+  const [locations, setLocations] = React.useState<BaseRow[]>([]);
+  const [staff, setStaff] = React.useState<StaffRow[]>([]);
+  const [departments, setDepartments] = React.useState<BaseRow[]>([]);
+  const [reasons, setReasons] = React.useState<BaseRow[]>([]);
+  const [partners, setPartners] = React.useState<PartnerRow[]>([]);
   const [status, setStatus] = React.useState<{ type: 'success' | 'error', message: string } | null>(null);
   const [lastTxId, setLastTxId] = React.useState<number | null>(null);
   const [currentStock, setCurrentStock] = React.useState<number | null>(null);
@@ -57,13 +59,14 @@ export default function TransactionForm({ type }: { type: 'IN' | 'OUT' }) {
     partner: ''
   });
 
-  const [suggestions, setSuggestions] = React.useState({
+  type SuggestionItem = { id: number; name: string };
+  const [suggestions, setSuggestions] = React.useState<Record<string, SuggestionItem[]>>({
     material: [],
     location: [],
     operator: [],
     department: [],
     recipient: [],
-    partner: []
+    partner: [],
   });
 
   const [showSuggestions, setShowSuggestions] = React.useState({
@@ -115,12 +118,12 @@ export default function TransactionForm({ type }: { type: 'IN' | 'OUT' }) {
   React.useEffect(() => {
     const fetchData = async () => {
       const [m, l, s, d, r, p] = await Promise.all([
-        apiClient.get<any[]>('/api/materials'),
-        apiClient.get<any[]>('/api/settings/locations'),
-        apiClient.get<any[]>('/api/settings/staff'),
-        apiClient.get<any[]>('/api/settings/departments'),
-        apiClient.get<any[]>('/api/settings/reasons'),
-        apiClient.get<any[]>('/api/settings/partners')
+        apiClient.get<Material[]>('/api/materials'),
+        apiClient.get<BaseRow[]>('/api/settings/locations'),
+        apiClient.get<StaffRow[]>('/api/settings/staff'),
+        apiClient.get<BaseRow[]>('/api/settings/departments'),
+        apiClient.get<BaseRow[]>('/api/settings/reasons'),
+        apiClient.get<PartnerRow[]>('/api/settings/partners'),
       ]);
       setMaterials(m);
       setLocations(l);
@@ -147,13 +150,12 @@ export default function TransactionForm({ type }: { type: 'IN' | 'OUT' }) {
   const handleInputChange = (field: string, value: string) => {
     setCombinedData({...combinedData, [field]: value});
     setSelectedIds({...selectedIds, [field]: ''});
-    
-    let filteredSuggestions = [];
-    
+    const v = value.toLowerCase();
+    let filteredSuggestions: SuggestionItem[] = [];
     switch (field) {
       case 'material':
         filteredSuggestions = materials
-          .filter(m => m.name.toLowerCase().includes(value.toLowerCase()) || m.code.toLowerCase().includes(value.toLowerCase()))
+          .filter(m => m.name.toLowerCase().includes(v) || (m.code ?? '').toLowerCase().includes(v))
           .map(m => ({ id: m.id, name: `${m.code} - ${m.name} (${m.spec || ''})` }))
           .slice(0, 5);
         break;
@@ -195,7 +197,7 @@ export default function TransactionForm({ type }: { type: 'IN' | 'OUT' }) {
 
   // 处理输入框获得焦点，显示所有建议
   const handleFocus = (field: string) => {
-    let allSuggestions = [];
+    let allSuggestions: SuggestionItem[] = [];
     
     switch (field) {
       case 'material':
@@ -375,9 +377,10 @@ export default function TransactionForm({ type }: { type: 'IN' | 'OUT' }) {
       clearForm();
       setPreviewOpen(false);
       setPreviewPayload(null);
-    } catch (err: any) {
-      message.error(err?.message || '提交失败');
-      setStatus({ type: 'error', message: err?.message || '网络错误' });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : '提交失败';
+      notifyError(msg);
+      setStatus({ type: 'error', message: msg });
     } finally {
       setLoading(false);
     }
@@ -391,9 +394,9 @@ export default function TransactionForm({ type }: { type: 'IN' | 'OUT' }) {
       const result = await buildSubmitPayload();
       setPreviewPayload(result);
       setPreviewOpen(true);
-    } catch (err: any) {
-      const msg = err?.message || '网络错误';
-      message.error(msg);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : '网络错误';
+      notifyError(msg);
       setStatus({ type: 'error', message: msg });
     } finally {
       setLoading(false);
@@ -420,28 +423,22 @@ export default function TransactionForm({ type }: { type: 'IN' | 'OUT' }) {
       <div className="max-w-2xl mx-auto space-y-4">
         <div className="flex items-center justify-between">
           <div className="inline-flex rounded-full bg-slate-100 p-1">
-            <button
-              type="button"
+            <Button
+              type={type === 'IN' ? 'primary' : 'default'}
+              size="small"
               onClick={() => navigate('/inbound')}
-              className={`px-4 py-1.5 text-sm rounded-full transition-colors ${
-                type === 'IN'
-                  ? 'bg-white text-indigo-600 shadow-sm'
-                  : 'text-slate-500 hover:text-slate-800'
-              }`}
+              className={type === 'IN' ? '' : '!bg-transparent border-0 text-slate-500 hover:text-slate-800'}
             >
               入库登记
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              type={type === 'OUT' ? 'primary' : 'default'}
+              size="small"
               onClick={() => navigate('/outbound')}
-              className={`px-4 py-1.5 text-sm rounded-full transition-colors ${
-                type === 'OUT'
-                  ? 'bg-white text-orange-500 shadow-sm'
-                  : 'text-slate-500 hover:text-slate-800'
-              }`}
+              className={type === 'OUT' ? '!bg-orange-500 hover:!bg-orange-600 border-0' : '!bg-transparent border-0 text-slate-500 hover:text-slate-800'}
             >
               出库登记
-            </button>
+            </Button>
           </div>
           <Link to={type === 'IN' ? '/history?type=IN' : '/history?type=OUT'}>
             <Button type="link" size="small">
@@ -483,9 +480,10 @@ export default function TransactionForm({ type }: { type: 'IN' | 'OUT' }) {
                   setStatus({ type: 'success', message: '已撤销该操作。' });
                   setLastTxId(null);
                   message.success('已撤销');
-                } catch (e: any) {
-                  message.error(e?.message || '撤销失败');
-                  setStatus({ type: 'error', message: e?.message || '撤销失败' });
+                } catch (e: unknown) {
+                  const msg = e instanceof Error ? e.message : '撤销失败';
+                  notifyError(msg);
+                  setStatus({ type: 'error', message: msg });
                 }
               }}
             >

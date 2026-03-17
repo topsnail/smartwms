@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { apiClient, ApiError } from '../api/client';
+import { hasPermission } from '../../shared/permissions';
 
 export type Role = 'admin' | 'warehouse_keeper' | 'readonly' | 'reporter';
 
@@ -76,17 +77,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const can = (action: string): boolean => {
     if (!user) return false;
     const perms = user.permissions || [];
-    if (perms.includes('*')) return true;
-    // 兼容旧用法：outbound_only 用 outbound
-    if (action === 'outbound_only') return perms.includes('outbound');
-    // 兼容：细粒度权限 -> 旧 action
-    if (action === 'export') return perms.includes('export') || perms.some((p) => p.startsWith('export_'));
-    if (action === 'backup') return perms.includes('backup') || perms.includes('backup_db');
-    if (action === 'edit_material') return perms.includes('edit_material') || perms.includes('materials_edit') || perms.includes('materials_import') || perms.includes('upload_image');
-    if (action === 'delete_material') return perms.includes('delete_material') || perms.includes('materials_delete');
-    if (action === 'edit_settings') return perms.includes('edit_settings') || perms.includes('settings_edit');
-    if (action === 'delete_settings') return perms.includes('delete_settings') || perms.includes('settings_delete');
-    return perms.includes(action);
+    // 历史兼容：outbound_only 用 outbound
+    if (action === 'outbound_only') return hasPermission(perms, 'outbound');
+    return hasPermission(perms, action as any);
   };
 
   return (

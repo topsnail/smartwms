@@ -14,6 +14,7 @@ import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { useColumnVisibility } from '../hooks/useColumnVisibility';
 import { ColumnVisibilityPopover } from '../components/ColumnVisibilityPopover';
 import { PreviewImage } from '../components/PreviewImage';
+import { notifyError } from '../utils/notify';
 
 const DEFAULT_LOW_STOCK_THRESHOLD = 10;
 
@@ -81,8 +82,8 @@ export default function Inventory() {
       .then(setInventory)
       .catch((err) => {
         console.error(err);
+        notifyError('加载库存数据失败，请稍后重试');
         setError('加载库存数据失败，请稍后重试');
-        message.error('加载库存数据失败，请稍后重试');
       })
       .finally(() => setLoading(false));
   }, []);
@@ -122,7 +123,7 @@ export default function Inventory() {
       fetchAlertInventory();
       fetchInventory();
     } catch (error: any) {
-      message.error(error?.message || '更新库存预警阈值失败');
+      notifyError(error?.message || '更新库存预警阈值失败');
     }
   }, [editingAlert, alertForm, fetchAlertInventory, fetchInventory]);
 
@@ -185,7 +186,7 @@ export default function Inventory() {
       );
       message.success('导出成功');
     } catch (e: any) {
-      message.error(e?.message || '导出失败');
+      notifyError(e?.message || '导出失败');
     }
   }, []);
 

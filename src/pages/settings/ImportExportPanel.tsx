@@ -1,6 +1,7 @@
 import React from "react";
 import { Download, Package } from "lucide-react";
-import { Modal, Table, message } from "antd";
+import { Button, Modal, Table, message } from "antd";
+import { notifyError } from "../../utils/notify";
 import { useAuth } from "../../contexts/AuthContext";
 import { downloadWithAuth } from "../../api/download";
 import { apiClient } from "../../api/client";
@@ -82,7 +83,7 @@ export function ImportExportPanel() {
       await downloadWithAuth("/api/backup", `wms_backup_${new Date().toISOString().slice(0, 10)}_${Date.now()}.sql`);
       message.success("数据库备份已成功下载，请妥善保存备份文件");
     } catch (error: any) {
-      message.error(error?.message || "备份失败，请稍后重试");
+      notifyError(error?.message || "备份失败，请稍后重试");
     } finally {
       setBackupLoading(false);
     }
@@ -94,7 +95,7 @@ export function ImportExportPanel() {
       await downloadWithAuth(url, filename);
       message.success("导出成功");
     } catch (err: any) {
-      message.error(err?.message || "导出失败");
+      notifyError(err?.message || "导出失败");
     } finally {
       setExporting(null);
     }
@@ -110,14 +111,9 @@ export function ImportExportPanel() {
               建议定期下载备份文件并离线保存（例如每周一次）。
             </div>
           </div>
-          <button
-            onClick={handleBackup}
-            disabled={backupLoading}
-            className={`btn-primary text-white text-sm ${backupLoading ? "opacity-70 cursor-not-allowed" : ""}`}
-            style={{ color: "#fff" }}
-          >
+          <Button type="primary" size="small" onClick={handleBackup} loading={backupLoading}>
             {backupLoading ? "备份中..." : "备份数据库"}
-          </button>
+          </Button>
         </div>
       )}
 
@@ -125,7 +121,8 @@ export function ImportExportPanel() {
         <h4 className="font-bold mb-4">数据导出</h4>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {(can("export") || can("export_transactions")) && (
-            <button
+            <Button
+              type="default"
               disabled={exporting !== null}
               onClick={() =>
                 handleExport(
@@ -134,17 +131,18 @@ export function ImportExportPanel() {
                   `出入库记录_${new Date().toISOString().slice(0, 10).replaceAll("-", "")}.csv`
                 )
               }
-              className="p-4 border border-slate-200 rounded-lg hover:bg-slate-100 transition-colors flex items-center gap-3 text-slate-800"
+              className="!h-auto !p-4 !flex items-center gap-3 !text-slate-800 !text-left !border-slate-200"
+              icon={<Download size={24} className="text-indigo-600" />}
             >
-              <Download size={24} className="text-indigo-600" />
               <div>
                 <div className="font-medium">出入库记录</div>
                 <div className="text-xs text-slate-500">导出为CSV格式</div>
               </div>
-            </button>
+            </Button>
           )}
           {(can("export") || can("export_operation_logs")) && (
-            <button
+            <Button
+              type="default"
               disabled={exporting !== null}
               onClick={() =>
                 handleExport(
@@ -153,17 +151,18 @@ export function ImportExportPanel() {
                   `操作日志_${new Date().toISOString().slice(0, 10).replaceAll("-", "")}.csv`
                 )
               }
-              className="p-4 border border-slate-200 rounded-lg hover:bg-slate-100 transition-colors flex items-center gap-3 text-slate-800"
+              className="!h-auto !p-4 !flex items-center gap-3 !text-slate-800 !text-left !border-slate-200"
+              icon={<Download size={24} className="text-indigo-600" />}
             >
-              <Download size={24} className="text-indigo-600" />
               <div>
                 <div className="font-medium">操作日志</div>
                 <div className="text-xs text-slate-500">导出为CSV格式</div>
               </div>
-            </button>
+            </Button>
           )}
           {(can("export") || can("export_materials")) && (
-            <button
+            <Button
+              type="default"
               disabled={exporting !== null}
               onClick={() =>
                 handleExport(
@@ -172,17 +171,18 @@ export function ImportExportPanel() {
                   `物料信息_${new Date().toISOString().slice(0, 10).replaceAll("-", "")}.csv`
                 )
               }
-              className="p-4 border border-slate-200 rounded-lg hover:bg-slate-100 transition-colors flex items-center gap-3 text-slate-800"
+              className="!h-auto !p-4 !flex items-center gap-3 !text-slate-800 !text-left !border-slate-200"
+              icon={<Download size={24} className="text-indigo-600" />}
             >
-              <Download size={24} className="text-indigo-600" />
               <div>
                 <div className="font-medium">物料信息</div>
                 <div className="text-xs text-slate-500">导出为CSV格式</div>
               </div>
-            </button>
+            </Button>
           )}
           {(can("export") || can("export_inventory")) && (
-            <button
+            <Button
+              type="default"
               disabled={exporting !== null}
               onClick={() =>
                 handleExport(
@@ -191,14 +191,14 @@ export function ImportExportPanel() {
                   `库存数据_${new Date().toISOString().slice(0, 10).replaceAll("-", "")}.csv`
                 )
               }
-              className="p-4 border border-slate-200 rounded-lg hover:bg-slate-100 transition-colors flex items-center gap-3 text-slate-800"
+              className="!h-auto !p-4 !flex items-center gap-3 !text-slate-800 !text-left !border-slate-200"
+              icon={<Download size={24} className="text-indigo-600" />}
             >
-              <Download size={24} className="text-indigo-600" />
               <div>
                 <div className="font-medium">库存数据</div>
                 <div className="text-xs text-slate-500">导出为CSV格式</div>
               </div>
-            </button>
+            </Button>
           )}
         </div>
       </div>
@@ -215,13 +215,9 @@ export function ImportExportPanel() {
               <p className="text-xs text-slate-500 mb-4">
                 支持CSV格式文件，包含物料编码、名称、规格、单位、分类、来源、购价、售价等信息
               </p>
-              <button
-                onClick={handleDownloadMaterialTemplate}
-                className="text-sm text-indigo-600 hover:text-indigo-700 underline mb-4"
-                type="button"
-              >
+              <Button type="link" size="small" onClick={handleDownloadMaterialTemplate} className="!text-indigo-600 mb-4">
                 下载 CSV 模板
-              </button>
+              </Button>
               <div className="mb-4 text-xs text-slate-600">
                 <div className="font-medium mb-1">CSV文件格式示例：</div>
                 <div className="bg-white p-2 rounded border border-slate-200">
@@ -243,7 +239,7 @@ export function ImportExportPanel() {
                     const text = await file.text();
                     const parsed = parseCsvToMaterials(text);
                     if (parsed.length === 0) {
-                      message.error("文件中没有有效的物料数据");
+                      notifyError("文件中没有有效的物料数据");
                       return;
                     }
                     const preview = parsed.slice(0, 30);
@@ -298,7 +294,7 @@ export function ImportExportPanel() {
                     }
                   } catch (err: any) {
                     if (String(err?.message) === "cancel") return;
-                    message.error(err?.message || "导入失败，请稍后重试");
+                    notifyError(err?.message || "导入失败，请稍后重试");
                   }
                 }}
                 className="hidden"

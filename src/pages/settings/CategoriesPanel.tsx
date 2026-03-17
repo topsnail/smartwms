@@ -1,6 +1,7 @@
 import React from "react";
 import { Edit, Plus, Trash2 } from "lucide-react";
-import { Empty, Input, Popconfirm, message } from "antd";
+import { Button, Empty, Input, Popconfirm, message } from "antd";
+import { notifyError } from "../../utils/notify";
 import { useAuth } from "../../contexts/AuthContext";
 import { apiClient } from "../../api/client";
 import type { CategoryRow } from "./types";
@@ -33,7 +34,7 @@ export function CategoriesPanel() {
       setData(rows);
       setAllCategories(rows);
     } catch {
-      message.error("加载物料分类失败，请稍后重试");
+      notifyError("加载物料分类失败，请稍后重试");
     }
   }, []);
 
@@ -63,14 +64,14 @@ export function CategoriesPanel() {
       message.success("删除成功");
       fetchData();
     } catch (err: any) {
-      message.error(err?.message || "删除失败，请稍后重试");
+      notifyError(err?.message || "删除失败，请稍后重试");
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
-      message.error("请输入分类名称");
+      notifyError("请输入分类名称");
       return;
     }
     try {
@@ -88,7 +89,7 @@ export function CategoriesPanel() {
       setIsModalOpen(false);
       fetchData();
     } catch (err: any) {
-      message.error(err?.message || "操作失败，请稍后重试");
+      notifyError(err?.message || "操作失败，请稍后重试");
     }
   };
 
@@ -103,14 +104,9 @@ export function CategoriesPanel() {
           style={{ width: 240 }}
         />
         {can("edit_settings") && (
-          <button
-            onClick={openCreate}
-            className="btn-primary text-white text-sm flex items-center gap-2"
-            style={{ color: "#fff" }}
-          >
-            <Plus size={18} />
+          <Button type="primary" size="small" onClick={openCreate} icon={<Plus size={18} />}>
             新增
-          </button>
+          </Button>
         )}
       </div>
 
@@ -128,13 +124,7 @@ export function CategoriesPanel() {
               <span className="text-sm font-bold text-slate-900">{item.name}</span>
               <div className="flex gap-2">
                 {can("edit_settings") && (
-                  <button
-                    onClick={() => openEdit(item)}
-                    className="btn-icon p-1.5 text-slate-600 hover:text-blue-600"
-                    title="编辑"
-                  >
-                    <Edit size={16} />
-                  </button>
+                  <Button type="text" size="small" onClick={() => openEdit(item)} className="!p-1.5 text-slate-600 hover:!text-blue-600" title="编辑" icon={<Edit size={16} />} />
                 )}
                 {can("delete_settings") && (
                   <Popconfirm
@@ -145,12 +135,7 @@ export function CategoriesPanel() {
                     okButtonProps={{ danger: true }}
                     onConfirm={() => handleDelete(item.id)}
                   >
-                    <button
-                      className="p-1.5 text-slate-400 hover:text-red-600 rounded-lg transition-colors"
-                      title="删除"
-                    >
-                      <Trash2 size={16} />
-                    </button>
+                    <Button type="text" size="small" className="!p-1.5 text-slate-400 hover:!text-red-600" title="删除" icon={<Trash2 size={16} />} />
                   </Popconfirm>
                 )}
               </div>
@@ -174,9 +159,7 @@ export function CategoriesPanel() {
               <h3 className="text-lg font-bold text-slate-900">
                 {editing ? "编辑物料分类" : "新增物料分类"}
               </h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600">
-                <Plus size={24} className="rotate-45" />
-              </button>
+              <Button type="text" size="small" onClick={() => setIsModalOpen(false)} className="!text-slate-400 hover:!text-slate-600" icon={<Plus size={24} className="rotate-45" />} />
             </div>
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
               <div className="space-y-1">
@@ -218,19 +201,12 @@ export function CategoriesPanel() {
                 />
               </div>
               <div className="pt-4 flex gap-3">
-                <button
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="btn-secondary flex-1 text-sm"
-                >
+                <Button type="default" className="flex-1" onClick={() => setIsModalOpen(false)}>
                   取消
-                </button>
-                <button
-                  type="submit"
-                  className="btn-primary text-white flex-1 text-sm"
-                >
+                </Button>
+                <Button type="primary" htmlType="submit" className="flex-1">
                   保存
-                </button>
+                </Button>
               </div>
             </form>
           </div>

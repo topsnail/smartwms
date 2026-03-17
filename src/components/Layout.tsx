@@ -16,7 +16,7 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { Breadcrumb, Tooltip } from 'antd';
+import { Breadcrumb, Button, Tooltip } from 'antd';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -101,13 +101,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
             {!collapsed ? (
               <Tooltip title="收起侧边栏">
-                <button
-                  onClick={() => setCollapsed(true)}
-                  className="p-1.5 text-slate-500 hover:text-blue-600 rounded-lg hover:bg-slate-50"
-                  aria-label="收起侧边栏"
-                >
+                <Button type="text" size="small" onClick={() => setCollapsed(true)} className="!p-1.5 text-slate-500 hover:!text-blue-600 hover:!bg-slate-50" aria-label="收起侧边栏">
                   <ChevronLeft size={18} />
-                </button>
+                </Button>
               </Tooltip>
             ) : null}
           </div>
@@ -115,13 +111,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           {collapsed ? (
             <div className="mt-2 flex justify-center">
               <Tooltip title="展开侧边栏">
-                <button
-                  onClick={() => setCollapsed(false)}
-                  className="p-1.5 text-slate-500 hover:text-blue-600 rounded-lg hover:bg-slate-50"
-                  aria-label="展开侧边栏"
-                >
+                <Button type="text" size="small" onClick={() => setCollapsed(false)} className="!p-1.5 text-slate-500 hover:!text-blue-600 hover:!bg-slate-50" aria-label="展开侧边栏">
                   <ChevronRight size={18} />
-                </button>
+                </Button>
               </Tooltip>
             </div>
           ) : null}
@@ -177,23 +169,15 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             ) : null}
             {!collapsed ? (
               <Tooltip title="退出登录">
-                <button
-                  onClick={handleLogout}
-                  className="p-1.5 text-slate-400 hover:text-red-600 rounded-lg hover:bg-slate-50"
-                  aria-label="退出登录"
-                >
+                <Button type="text" size="small" onClick={handleLogout} className="!p-1.5 text-slate-400 hover:!text-red-600 hover:!bg-slate-50" aria-label="退出登录">
                   <LogOut size={18} />
-                </button>
+                </Button>
               </Tooltip>
             ) : (
               <Tooltip title="退出登录" placement="right">
-                <button
-                  onClick={handleLogout}
-                  className="p-1.5 text-slate-400 hover:text-red-600 rounded-lg hover:bg-slate-50"
-                  aria-label="退出登录"
-                >
+                <Button type="text" size="small" onClick={handleLogout} className="!p-1.5 text-slate-400 hover:!text-red-600 hover:!bg-slate-50" aria-label="退出登录">
                   <LogOut size={18} />
-                </button>
+                </Button>
               </Tooltip>
             )}
           </div>
@@ -206,12 +190,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           <Package size={20} className="text-indigo-600" />
           SmartWMS
         </h1>
-        <button 
-          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          className="p-2 text-slate-600"
-        >
+        <Button type="text" size="small" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="!p-2 text-slate-600">
           {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
-        </button>
+        </Button>
       </div>
 
       {/* Mobile Menu Overlay */}
@@ -255,9 +236,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             );
           })}
           <div className="p-4 border-t border-slate-100 mt-4">
-            <button onClick={handleLogout} className="flex items-center gap-3 px-3 py-2 w-full text-slate-600 hover:text-red-600 rounded-lg">
+            <Button type="text" onClick={handleLogout} className="!flex items-center gap-3 !px-3 !py-2 w-full text-slate-600 hover:!text-red-600 rounded-lg">
               <LogOut size={18} /> 退出登录
-            </button>
+            </Button>
           </div>
         </nav>
       </aside>

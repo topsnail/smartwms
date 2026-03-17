@@ -12,6 +12,7 @@ import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { useColumnVisibility } from '../hooks/useColumnVisibility';
 import { ColumnVisibilityPopover } from '../components/ColumnVisibilityPopover';
 import { PreviewImage } from '../components/PreviewImage';
+import { notifyError } from '../utils/notify';
 import { 
   getMaterials, 
   createMaterial, 
@@ -124,7 +125,7 @@ export default function Materials() {
       setMaterials(data);
     } catch (error) {
       console.error(error);
-      message.error('加载物料列表失败，请稍后重试');
+      notifyError('加载物料列表失败，请稍后重试');
     } finally {
       setLoading(false);
     }
@@ -222,7 +223,7 @@ export default function Materials() {
       setEditingId(null);
       fetchMaterials();
     } catch (error: any) {
-      message.error(error?.message || '保存物料失败');
+      notifyError(error?.message || '保存物料失败');
     }
   }, [editingId, form, fetchMaterials]);
 
@@ -245,7 +246,7 @@ export default function Materials() {
       message.success('物料删除成功');
       fetchMaterials();
     } catch (error: any) {
-      message.error(error?.message || '删除物料失败');
+      notifyError(error?.message || '删除物料失败');
     }
   }, [fetchMaterials]);
 
@@ -260,7 +261,7 @@ export default function Materials() {
       setSelectedRowKeys([]);
       fetchMaterials();
     } catch (error: any) {
-      message.error(error?.message || '批量删除物料失败');
+      notifyError(error?.message || '批量删除物料失败');
     }
   }, [selectedRowKeys, fetchMaterials]);
 
@@ -277,7 +278,7 @@ export default function Materials() {
       window.URL.revokeObjectURL(url);
       message.success('物料导出成功');
     } catch (error: any) {
-      message.error(error?.message || '导出物料失败');
+      notifyError(error?.message || '导出物料失败');
     }
   }, []);
 
@@ -338,7 +339,7 @@ export default function Materials() {
         materials = parseCsvToMaterials(text);
       }
       if (materials.length === 0) {
-        message.error('文件中没有有效的物料数据');
+        notifyError('文件中没有有效的物料数据');
         return;
       }
       const res = await batchImportMaterials(materials);
@@ -346,7 +347,7 @@ export default function Materials() {
       message.success(`导入完成：成功 ${res.successCount} 个，失败 ${res.failedCount} 个`);
       fetchMaterials();
     } catch (error: any) {
-      message.error(error?.message || '导入物料失败');
+      notifyError(error?.message || '导入物料失败');
     }
   }, [importFile, importPreviewRows, parseCsvToMaterials, fetchMaterials]);
 
@@ -473,7 +474,7 @@ export default function Materials() {
         onSuccess && onSuccess(data as any);
       } catch (err: any) {
         console.error(err);
-        message.error(err?.message || '图片上传失败：' + (err?.message || '请尝试选择更小的图片'));
+        notifyError(err?.message || '图片上传失败：' + (err?.message || '请尝试选择更小的图片'));
         onError && onError(err);
       }
     } catch (err: any) {
@@ -685,7 +686,7 @@ export default function Materials() {
       setSelectedRowKeys([]);
       fetchMaterials();
     } catch (e: any) {
-      message.error(e?.message || '批量更新失败');
+      notifyError(e?.message || '批量更新失败');
     }
   }, [batchForm, selectedRowKeys, fetchMaterials]);
 

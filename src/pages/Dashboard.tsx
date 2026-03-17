@@ -21,6 +21,8 @@ import { zhCN } from 'date-fns/locale';
 import { parseUtc } from '../utils/date';
 import { useAuth } from '../contexts/AuthContext';
 import { getDashboardStats, type DashboardStats } from '../api/dashboard';
+import { notifyError } from '../utils/notify';
+import { Button } from 'antd';
 
 type TimeRange = 'today' | 'week' | 'month';
 
@@ -88,6 +90,7 @@ export default function Dashboard() {
       setLastUpdated(new Date());
     } catch (err) {
       console.error(err);
+      notifyError('数据加载失败，请刷新页面重试');
       setError('数据加载失败，请刷新页面重试');
     } finally {
       setLoading(false);
@@ -139,14 +142,16 @@ export default function Dashboard() {
                 数据于 {minutesAgo === 0 ? '刚刚' : `${minutesAgo} 分钟前`} 更新
               </span>
             )}
-            <button
+            <Button
+              type="default"
+              size="small"
               onClick={() => fetchData(true)}
               disabled={refreshing || loading}
-              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50 transition-colors text-sm font-medium"
+              className="inline-flex items-center gap-2"
+              icon={refreshing ? <RefreshCw size={16} className="animate-spin" /> : <RefreshCw size={16} />}
             >
-              <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} />
               刷新
-            </button>
+            </Button>
           </div>
         }
       />

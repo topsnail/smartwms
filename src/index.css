@@ -17,6 +17,8 @@
     --wms-primary: #1890ff; /* AntD 蓝 */
     --wms-primary-hover: #1677ff; /* AntD hover */
     --wms-primary-soft: #e6f4ff; /* AntD fill */
+    --wms-radius: 8px;
+    --wms-control-height: 36px;
   }
 
   /* 让 AntD 默认文字颜色与 Tailwind 体系一致 */
@@ -112,12 +114,10 @@
   .ant-table,
   .ant-table-container {
     border-color: var(--wms-border);
-    border-radius: 0.5rem; /* 8px */
   }
 
   .ant-card {
     background: var(--wms-surface);
-    border-radius: 0.5rem; /* 8px */
     box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   }
 
@@ -145,63 +145,34 @@
     box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12) !important;
   }
 
-  /* AntD 按钮样式统一 */
-  .ant-btn {
-    border-radius: 0.5rem !important; /* 8px */
-    font-weight: 500 !important;
-    transition: all 0.2s ease !important;
-    display: inline-flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    gap: 0.5rem !important;
-  }
-
-  /* AntD：整体字号与控件尺寸下调一档（更贴合左侧导航与内容区密度） */
-  .ant-btn,
-  .ant-input,
-  .ant-input-number,
-  .ant-select,
-  .ant-picker,
-  .ant-table,
-  .ant-form,
-  .ant-modal,
-  .ant-drawer,
-  .ant-message,
-  .ant-notification {
-    font-size: 13px !important;
-  }
-
-  /* 统一表单控件高度（搜索输入框/筛选下拉/日期选择）= 36px */
-  .ant-input,
+  /*
+    高度/圆角的主来源应是 ConfigProvider token（更易维护）。
+    这里仅对少数“外层壳”做补丁，避免出现个别控件漏网（如带 prefix 的搜索框外壳）。
+  */
   .ant-input-affix-wrapper,
-  .ant-input-number,
   .ant-input-number-affix-wrapper,
   .ant-picker,
   .ant-select .ant-select-selector {
-    height: 36px !important;
-    padding-block: 0 !important;
-    display: inline-flex !important;
-    align-items: center !important;
+    height: var(--wms-control-height) !important;
+    border-radius: var(--wms-radius) !important;
+    display: inline-flex;
+    align-items: center;
   }
 
-  /* 统一圆角半径 = 8px（输入/选择/日期/数字输入外层） */
   .ant-input,
-  .ant-input-affix-wrapper,
   .ant-input-number,
-  .ant-input-number-affix-wrapper,
-  .ant-picker,
-  .ant-select .ant-select-selector {
-    border-radius: 0.5rem !important; /* 8px */
+  .ant-input-number .ant-input-number-input {
+    border-radius: var(--wms-radius) !important;
   }
 
-  /* 让 Select 内部搜索框高度跟随 36px */
+  /* 让 Select 内部搜索框高度跟随 control height */
   .ant-select .ant-select-selection-search-input {
-    height: 34px !important;
+    height: calc(var(--wms-control-height) - 2px) !important;
   }
 
   /* InputNumber 内部 input 也跟随高度 */
   .ant-input-number .ant-input-number-input {
-    height: 34px !important;
+    height: calc(var(--wms-control-height) - 2px) !important;
   }
 
   .ant-input::placeholder,
@@ -209,21 +180,7 @@
     font-size: 12px !important;
   }
 
-  .ant-btn {
-    font-size: 13px !important;
-    height: 36px !important;
-    padding-inline: 12px !important;
-    padding-block: 0 !important;
-  }
-
-  .ant-btn-lg {
-    height: 36px !important;
-  }
-
-  .ant-btn-sm {
-    height: 28px !important;
-    padding-inline: 10px !important;
-  }
+  /* 按钮尺寸/圆角交给 token，避免全局强覆盖导致维护成本上升 */
 
   .ant-btn-primary {
     background-color: var(--wms-primary) !important;

@@ -18,6 +18,7 @@ import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { useColumnVisibility } from '../hooks/useColumnVisibility';
 import { ColumnVisibilityPopover } from '../components/ColumnVisibilityPopover';
 import { PreviewImage } from '../components/PreviewImage';
+import { notifyError } from '../utils/notify';
 
 type FilterType = 'ALL' | TransactionType;
 
@@ -75,7 +76,7 @@ export default function History() {
       })
       .catch((err) => {
         console.error(err);
-        message.error('加载出入记录失败，请稍后重试');
+        notifyError('加载出入记录失败，请稍后重试');
       })
       .finally(() => setLoading(false));
   }, [filterType, dateRange, debouncedKeyword, page, pageSize]);
@@ -113,8 +114,8 @@ export default function History() {
         `出入库记录_${format(new Date(), 'yyyyMMdd')}.csv`
       );
       message.success('导出成功');
-    } catch (err: any) {
-      message.error(err?.message || '导出失败');
+    } catch (err: unknown) {
+      notifyError(err instanceof Error ? err.message : '导出失败');
     }
   };
 
