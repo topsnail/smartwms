@@ -1,6 +1,7 @@
 import React from "react";
 import { Download, Package } from "lucide-react";
 import { Button, Modal, Table, message } from "antd";
+import Papa from "papaparse";
 import { notifyError } from "../../utils/notify";
 import { useAuth } from "../../contexts/AuthContext";
 import { downloadWithAuth } from "../../api/download";
@@ -12,56 +13,118 @@ export function ImportExportPanel() {
   const [exporting, setExporting] = React.useState<string | null>(null);
   const [backupLoading, setBackupLoading] = React.useState(false);
 
-  const parseCsvToMaterials = React.useCallback((text: string): SaveMaterialInput[] => {
-    const lines = text.split("\n").filter((line) => line.trim());
-    if (lines.length < 2) return [];
-    const headers = lines[0].split(",").map((h) => h.replace(/\"/g, "").trim());
-    const materials: SaveMaterialInput[] = [];
-    for (let i = 1; i < lines.length; i++) {
-      const values = lines[i].split(",").map((v) => v.replace(/\"/g, "").trim());
-      const material: SaveMaterialInput = {} as SaveMaterialInput;
-      headers.forEach((header, index) => {
-        const value = values[index];
-        switch (header) {
-          // 新模板
+  const parseCsvToMaterials = React.useCallback(
+    (text: string): { materials: SaveMaterialInput[]; errors: { line: number; message: string }[] } => {
+      const mapHeader = (raw: string): keyof SaveMaterialInput | null => {
+        const h = String(raw || "").replace(/\uFEFF/g, "").trim();
+        switch (h) {
           case "物料编码":
-          // 旧示例
           case "编码":
-            material.code = value || undefined;
-            break;
+          case "code":
+            return "code";
           case "物料名称":
           case "名称":
-            material.name = value;
-            break;
+          case "name":
+            return "name";
           case "规格型号":
           case "规格":
-            material.spec = value || undefined;
-            break;
+          case "spec":
+            return "spec";
           case "单位":
-            material.unit = value || undefined;
-            break;
+          case "unit":
+            return "unit";
           case "分类":
-            material.category = value || undefined;
-            break;
+          case "category":
+            return "category";
           case "来源":
-            material.source = value || undefined;
-            break;
+          case "source":
+            return "source";
           case "购价":
-            material.purchase_price = value ? Number(value) : undefined;
-            break;
+          case "purchase_price":
+            return "purchase_price";
           case "售价":
-            material.sale_price = value ? Number(value) : undefined;
-            break;
+          case "sale_price":
+            return "sale_price";
           case "图片URL":
           case "图片":
-            material.image_url = value || undefined;
-            break;
+          case "image_url":
+            return "image_url";
+          default:
+            return null;
         }
+      };
+
+      const toText = (v: unknown): string => String(v ?? "").replace(/\r/g, "").trim();
+      const toOptText = (v: unknown): string | undefined => {
+        const s = toText(v);
+        return s ? s : undefined;
+      };
+      const toOptNumber = (v: unknown): number | undefined => {
+        const s = toText(v);
+        if (!s) return undefined;
+        const n = Number(s);
+        if (!Number.isFinite(n) || n < 0) return undefined;
+        return n;
+      };
+
+      const parsed = Papa.parse<Record<string, unknown>>(text, {
+        header: true,
+        skipEmptyLines: "greedy",
+        transformHeader: (h) => {
+          const mapped = mapHeader(h);
+          return mapped ? String(mapped) : "__ignore__";
+        },
       });
-      if (material.name) materials.push(material);
-    }
-    return materials;
-  }, []);
+
+      const errors: { line: number; message: string }[] = [];
+      if (parsed.errors?.length) {
+        for (const e of parsed.errors.slice(0, 20)) {
+          errors.push({ line: (e.row ?? 0) + 2, message: e.message || "CSV 解析错误" });
+        }
+      }
+
+      const rows = (parsed.data ?? []).filter((r) => r && typeof r === "object");
+      const materials: SaveMaterialInput[] = [];
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i] as Record<string, unknown>;
+        // Papa 的 row 是 data 行索引（从 0 开始），加上 header 行（1）= +2
+        const line = i + 2;
+
+        const name = toText(row.name);
+        if (!name) {
+          // 空行/无效行直接跳过（不计为错误），避免用户末尾多空行导致“失败很多”
+          const maybeAny = ["code", "spec", "unit", "category", "source", "purchase_price", "sale_price", "image_url"]
+            .some((k) => toText(row[k]) !== "");
+          if (maybeAny) errors.push({ line, message: "缺少必填字段：名称" });
+          continue;
+        }
+
+        const purchase_price = toOptNumber(row.purchase_price);
+        const sale_price = toOptNumber(row.sale_price);
+        if (toText(row.purchase_price) && purchase_price == null) errors.push({ line, message: "购价必须为非负数字" });
+        if (toText(row.sale_price) && sale_price == null) errors.push({ line, message: "售价必须为非负数字" });
+
+        const m: SaveMaterialInput = {
+          code: toOptText(row.code),
+          name,
+          spec: toOptText(row.spec),
+          unit: toOptText(row.unit),
+          category: toOptText(row.category),
+          source: toOptText(row.source),
+          purchase_price,
+          sale_price,
+          image_url: toOptText(row.image_url),
+        };
+        materials.push(m);
+      }
+
+      return { materials, errors };
+    },
+    []
+  );
+
+  const [importing, setImporting] = React.useState(false);
+  const [importProgress, setImportProgress] = React.useState<{ done: number; total: number } | null>(null);
 
   const handleDownloadMaterialTemplate = React.useCallback(() => {
     const header = "物料编码,物料名称,规格型号,单位,分类,来源,购价,售价,图片URL";
@@ -119,6 +182,9 @@ export function ImportExportPanel() {
 
       <div className="bg-slate-50 p-6 rounded-xl">
         <h4 className="font-bold mb-4">数据导出</h4>
+        <div className="text-xs text-slate-500 mb-4">
+          说明：出入库记录导出默认最多返回 5000 条（建议先筛选日期范围/关键字）。备份为逻辑 SQL，备份期间若仍有写入操作，可能出现跨表不一致，建议在低峰期执行。
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {(can("export") || can("export_transactions")) && (
             <Button
@@ -235,21 +301,45 @@ export function ImportExportPanel() {
                   const file = e.target.files?.[0];
                   if (!file) return;
                   try {
-                    message.info("正在导入物料信息，请稍候...");
+                    // 允许重复选择同一文件
+                    e.currentTarget.value = "";
+
+                    if (importing) return;
+                    setImporting(true);
+                    setImportProgress(null);
+                    message.info("正在解析 CSV，请稍候...");
                     const text = await file.text();
-                    const parsed = parseCsvToMaterials(text);
-                    if (parsed.length === 0) {
+                    const { materials, errors } = parseCsvToMaterials(text);
+                    if (errors.length) {
+                      Modal.warning({
+                        title: "CSV 格式或数据存在问题",
+                        content: (
+                          <div className="max-h-72 overflow-auto text-sm">
+                            <div className="mb-2 text-slate-600">
+                              已发现 <b>{errors.length}</b> 个问题（仅展示前 20 个）：
+                            </div>
+                            {errors.slice(0, 20).map((x, i) => (
+                              <div key={i} className="mb-1">
+                                第 <b>{x.line}</b> 行：{x.message}
+                              </div>
+                            ))}
+                          </div>
+                        ),
+                      });
+                    }
+
+                    if (materials.length === 0) {
                       notifyError("文件中没有有效的物料数据");
                       return;
                     }
-                    const preview = parsed.slice(0, 30);
+                    const preview = materials.slice(0, 30);
                     await new Promise<void>((resolve, reject) => {
                       Modal.confirm({
                         title: "导入预览",
                         content: (
                           <div className="space-y-3">
                             <div className="text-sm text-slate-600">
-                              共解析到 <b>{parsed.length}</b> 条物料，确认后将提交导入。
+                              共解析到 <b>{materials.length}</b> 条物料，确认后将分批提交导入。
                             </div>
                             <div className="max-h-56 overflow-auto border border-slate-200 rounded-md">
                               <Table
@@ -265,7 +355,7 @@ export function ImportExportPanel() {
                                 ]}
                               />
                             </div>
-                            {parsed.length > 30 ? (
+                            {materials.length > 30 ? (
                               <div className="text-xs text-slate-500">仅展示前 30 条，导入时将提交全部。</div>
                             ) : null}
                           </div>
@@ -276,14 +366,31 @@ export function ImportExportPanel() {
                         onCancel: () => reject(new Error("cancel")),
                       });
                     });
-                    const res = await batchImportMaterials(parsed);
-                    message.success(`导入完成：成功 ${res.successCount} 个，失败 ${res.failedCount} 个`);
-                    if (res.failedCount > 0) {
+
+                    // 分批提交，避免一次性请求体过大/失败成本高
+                    const chunkSize = 300;
+                    const total = materials.length;
+                    let ok = 0;
+                    let fail = 0;
+                    const failedItems: { item: SaveMaterialInput; error: string }[] = [];
+
+                    for (let i = 0; i < total; i += chunkSize) {
+                      const chunk = materials.slice(i, i + chunkSize);
+                      setImportProgress({ done: Math.min(i, total), total });
+                      const res = await batchImportMaterials(chunk);
+                      ok += res.successCount || 0;
+                      fail += res.failedCount || 0;
+                      if (Array.isArray(res.failedItems)) failedItems.push(...res.failedItems);
+                    }
+                    setImportProgress({ done: total, total });
+
+                    message.success(`导入完成：成功 ${ok} 个，失败 ${fail} 个`);
+                    if (fail > 0) {
                       Modal.info({
                         title: "导入失败项（前 20 条）",
                         content: (
                           <div className="max-h-72 overflow-auto">
-                            {res.failedItems.slice(0, 20).map((x, i) => (
+                            {failedItems.slice(0, 20).map((x, i) => (
                               <div key={i} className="text-sm mb-2">
                                 <b>{x.item?.name || "未命名"}</b>：{x.error}
                               </div>
@@ -295,6 +402,9 @@ export function ImportExportPanel() {
                   } catch (err: any) {
                     if (String(err?.message) === "cancel") return;
                     notifyError(err?.message || "导入失败，请稍后重试");
+                  } finally {
+                    setImporting(false);
+                    setImportProgress(null);
                   }
                 }}
                 className="hidden"
@@ -304,7 +414,7 @@ export function ImportExportPanel() {
                 htmlFor="material-import"
                 className="btn-primary inline-block cursor-pointer"
               >
-                选择CSV文件
+                {importing && importProgress ? `导入中 ${importProgress.done}/${importProgress.total}` : "选择CSV文件"}
               </label>
             </div>
           )}

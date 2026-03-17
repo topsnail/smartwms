@@ -1,6 +1,3 @@
-SmartWMS（Cloudflare Pages 生产部署版）
-====================================
-
 SmartWMS 是一个面向中文用户的轻量级仓储管理系统，支持物料、库存、出入库流水、报表、系统设置与权限体系，并提供操作日志审计与 IP 归属地展示。
 
 本仓库已按 **Cloudflare Pages + Pages Functions + D1 +（可选）R2** 形态优化，适用于生产环境部署。
@@ -22,6 +19,8 @@ SmartWMS 是一个面向中文用户的轻量级仓储管理系统，支持物�
 - [10. 权限模型](#10-权限模型)
 - [11. 常见运维与排障](#11-常见运维与排障)
 - [12. 二次开发指南](#12-二次开发指南)
+- [13. UI 与交互规范（团队约定）](#13-ui-与交互规范团队约定)
+- [14. 开发/测试/发布流程](#14-开发测试发布流程)
 
 ---
 
@@ -93,11 +92,22 @@ SmartWMS 是一个面向中文用户的轻量级仓储管理系统，支持物�
   - `src/api/`：前端 API 调用封装
   - `src/constants/`：常量（表格、日期快捷、操作日志中文映射等）
   - `src/contexts/`：认证与权限上下文
-  - `src/utils/`：工具函数（时间解析等）
+  - `src/utils/`：工具函数（时间解析、统一错误提示等），例如：
+    - `src/utils/notify.ts`：`notifyError()` 统一封装 AntD 的错误提示，替代散落的 `message.error`
 
 - `functions/`：Cloudflare Pages Functions（后端）
-  - `functions/api/[[route]].ts`：主要 API（`/api/*`）
+  - `functions/api/[[route]].ts`：API 入口，仅负责挂载各领域路由与通用中间件
+  - `functions/api/lib/`：后端共享工具
+    - `lib/types.ts`：Env/Bindings/D1/R2 等类型定义
+    - `lib/auth.ts`：JWT、会话、权限校验等
+    - `lib/migrations.ts`：基于 `schema_migrations` 的版本化数据库迁移
+  - `functions/api/routes/`：按领域拆分的路由模块（`/api/*`）
+    - `auth.ts`、`uploads.ts`、`materials.ts`、`inventory.ts`、`transactions.ts`
+    - `settings.ts`（基础资料）、`reports.ts`、`operationLogs.ts`、`ipGeo.ts`
+    - `export.ts`、`backup.ts`、`users.ts`、`rolePermissions.ts`、`dashboard.ts`
   - `functions/_middleware.ts`：全站安全响应头 + 缓存策略
+
+- `shared/permissions.ts`：前后端共享的权限常量与 `hasPermission()` 实现，保证两端权限点完全一致
 
 - `public/`：静态资源
   - `public/_redirects`：SPA 回退规则（非 `/api/*` 回到 `index.html`）
@@ -150,13 +160,28 @@ SmartWMS 是一个面向中文用户的轻量级仓储管理系统，支持物�
 
 ## 6. 数据库初始化（D1）
 
-### 6.1 建表
+### 6.1 建表（首次部署）
 
 在 Cloudflare 控制台的 D1 Console 中执行：
 
-- `scripts/d1-schema.sql`
+- 运行一次 `scripts/d1-schema.sql`
 
-### 6.2 初始化管理员
+### 6.2 版本化迁移（后续升级）
+
+从当前版本开始，后端不再在各路由中零散地 `CREATE TABLE / ALTER TABLE`，而是通过 `functions/api/lib/migrations.ts` 中的 **版本化迁移** 统一管理：
+
+- 迁移元信息表：`schema_migrations (id, name, applied_at)`
+- 应用启动时，入口中的 `ensureSchema()` 会调用 `runMigrations(DB)`：
+  - 按顺序执行尚未记录到 `schema_migrations` 的迁移
+  - 任意迁移失败会写入日志并抛出错误（返回 500），**不会静默吞掉**
+
+如需新增字段/表，建议：
+
+1. 在 `lib/migrations.ts` 中追加一个新的 `Migration`（自增 `id`）
+2. 本地跑一次 `npm run typecheck && npm run build`
+3. 部署到 Pages 后自动执行迁移
+
+### 6.3 初始化管理员
 
 执行 `scripts/seed-admin.sql` 创建默认管理员：
 
@@ -292,4 +317,66 @@ npm run build
 - **不要在前端打包注入敏感密钥**（如 API Key）。
 - **接口返回结构尽量统一**，避免前端到处做兼容分支。
 - 涉及库存扣减等关键数据写入，请优先使用数据库层面的条件更新确保原子性。
+
+---
+
+## 13. UI 与交互规范（团队约定）
+
+本项目已统一为 Ant Design 为主的组件风格，并用 Tailwind 做布局与细节。为避免“改 A 影响 B”，建议新增/修改 UI 时遵循以下约定。
+
+### 13.1 按钮统一
+
+- **优先使用 AntD `Button`**，避免自绘 `<button>`。
+- **按钮语义**
+  - 主操作：`<Button type="primary">`
+  - 次操作：`<Button type="default">`
+  - 文本/图标操作：`<Button type="text">` 或 `type="link"`
+  - 危险操作：`<Button danger>`
+- **加载态**：异步请求时使用 `loading={true}`，不要手动拼接“保存中.../备份中...”来模拟 disabled。
+
+> 说明：目前仅保留了一个用于触发文件选择的 `<label htmlFor="material-import">`，其余页面已不再使用原生 `<button>`。
+
+### 13.2 统一错误提示
+
+项目提供 `src/utils/notify.ts`：
+
+- `notifyError(message)`：统一封装 `message.error`，并在弹新提示前 `message.destroy()`，避免错误提示堆叠。
+- 约定：页面中的错误提示统一使用 `notifyError()`；成功/信息提示仍可使用 `message.success/info/warning`。
+
+### 13.3 表格与筛选区
+
+- 列表页建议保持“**筛选区 → 操作区 → 表格**”的顺序。
+- 表格列可见性与分页等行为尽量复用现有 hooks（如 `useColumnVisibility`、`useDebouncedValue`）。
+
+---
+
+## 14. 开发/测试/发布流程
+
+### 14.1 本地开发（前端）
+
+```bash
+npm install
+npm run dev
+```
+
+### 14.2 类型检查与构建
+
+```bash
+npm run typecheck
+npm run build
+```
+
+### 14.3 数据库升级（迁移）
+
+新增/修改表结构时：
+
+1. 在 `functions/api/lib/migrations.ts` 追加新的迁移（递增 `id`，保持只追加不重排）。
+2. 在迁移 `up()` 中写 D1 SQL（必要时注意 `ALTER TABLE` 的幂等处理）。
+3. 本地跑 `npm run typecheck && npm run build`
+4. 部署到 Pages 后，`runMigrations(DB)` 会自动执行未执行迁移，并记录到 `schema_migrations`。
+
+### 14.4 发布建议（避免影响线上）
+
+- **小步提交**：一次只做一个领域/一个页面改动，便于回滚与定位问题。
+- **每次迭代必跑**：`npm run typecheck`；涉及路由与构建产物变更时再跑 `npm run build`。
 
