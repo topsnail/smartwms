@@ -76,7 +76,7 @@ export function batchUpdateMaterials(ids: number[], updates: { category_id?: num
 }
 
 export async function exportMaterials(): Promise<Blob> {
-  return apiClient.getBlob('/api/export/materials');
+  return apiClient.getBlob('/api/export/materials', { timeoutMs: 180_000 });
 }
 
 export function batchImportMaterials(materials: SaveMaterialInput[]) {

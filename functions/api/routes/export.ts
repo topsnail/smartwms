@@ -10,6 +10,9 @@ type Deps = {
 };
 
 export function registerExportRoutes(app: Hono<Env>, deps: Deps) {
+  const fail = (message: string, status = 400) =>
+    ({ success: false, error: { code: status >= 500 ? "INTERNAL_ERROR" : "VALIDATION_FAILED", message } } as const);
+
   app.get("/export/materials", async (c) => {
     const user = await deps.requirePermission(c, "export_materials");
     if (!user) return c.res;
@@ -92,7 +95,7 @@ export function registerExportRoutes(app: Hono<Env>, deps: Deps) {
     const url = new URL(c.req.url);
     const start_date = url.searchParams.get("start_date");
     const end_date = url.searchParams.get("end_date");
-    if (!start_date || !end_date) return c.json({ error: "请提供开始日期和结束日期" }, 400);
+    if (!start_date || !end_date) return c.json(fail("请提供开始日期和结束日期", 400), 400);
     const start = String(start_date);
     const end = String(end_date) + " 23:59:59";
     let rows: Record<string, unknown>[] = [];
@@ -131,14 +134,14 @@ export function registerExportRoutes(app: Hono<Env>, deps: Deps) {
         rows = (results ?? []).map((r: Record<string, unknown>) => ({ code: r.code, name: r.name, quantity: Number(r.quantity ?? 0), unit_price: Number(r.unit_price ?? 0), value: Number(r.value ?? 0) }));
         headers = ["物料编码", "物料名称", "库存数量", "单价", "库存价值"];
       } else {
-        return c.json({ error: "无效的报表类型" }, 404);
+        return c.json(fail("无效的报表类型", 404), 404);
       }
       const headerToKey: Record<string, string> = { "物料编码": "code", "物料名称": "name", "期初库存": "beginning_stock", "期末库存": "ending_stock", "本期出库": "outbound", "周转率": "turnover_rate", "日期": "date", "入库数量": "inbound", "出库数量": "outbound", "净变化": "net_change", "往来单位": "partner_name", "使用数量": "usage", "占比": "percentage", "库存数量": "quantity", "单价": "unit_price", "库存价值": "value" };
       const lines = [headers.join(","), ...rows.map((r: Record<string, unknown>) => headers.map((h) => escapeCsv(r[headerToKey[h] || h] ?? "")).join(","))];
       const csv = "\uFEFF" + lines.join("\n");
       return new Response(csv, { headers: { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": `attachment; filename=report_${type}_${Date.now()}.csv` } });
     } catch (err: unknown) {
-      return c.json({ error: err instanceof Error ? err.message : "导出报表失败" }, 500);
+      return c.json(fail(err instanceof Error ? err.message : "导出报表失败", 500), 500);
     }
   });
 }

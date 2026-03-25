@@ -37,6 +37,9 @@ type Material = {
 };
 
 export function registerMaterialsRoutes(app: Hono<Env>, deps: Deps) {
+  const fail = (message: string, status = 400, code?: string) =>
+    ({ success: false, error: { code: code || (status >= 500 ? "INTERNAL_ERROR" : "VALIDATION_FAILED"), message } } as const);
+
   app.get("/materials", async (c) => {
     const user = await deps.requireAuthUser(c);
     if (!user) return c.res;
@@ -158,7 +161,7 @@ export function registerMaterialsRoutes(app: Hono<Env>, deps: Deps) {
     const user = await deps.requireAuthUser(c);
     if (!user) return c.res;
     const id = parseInt(c.req.param("id"), 10);
-    if (!Number.isFinite(id) || id <= 0) return c.json({ error: "无效的物料ID" }, 400);
+    if (!Number.isFinite(id) || id <= 0) return c.json(fail("无效的物料ID", 400), 400);
     const stockRow = await c.env.DB
       .prepare("SELECT COALESCE(SUM(quantity), 0) as total FROM inventory WHERE material_id = ?")
       .bind(id)
@@ -186,7 +189,7 @@ export function registerMaterialsRoutes(app: Hono<Env>, deps: Deps) {
     if (!user) return c.res;
     const url = new URL(c.req.url);
     const ids = url.searchParams.get("ids");
-    if (!ids) return c.json({ error: "请提供 ids 参数，如 ids=1,2,3" }, 400);
+    if (!ids) return c.json(fail("请提供 ids 参数，如 ids=1,2,3", 400), 400);
     const idList = ids
       .split(",")
       .map((s) => parseInt(s.trim(), 10))
@@ -270,7 +273,7 @@ export function registerMaterialsRoutes(app: Hono<Env>, deps: Deps) {
       );
       return c.json({ id: r.meta.last_row_id });
     } catch (err: any) {
-      return c.json({ error: err?.message ?? "新增物料失败" }, 400);
+      return c.json(fail(err?.message ?? "新增物料失败", 400), 400);
     }
   });
 
@@ -346,7 +349,7 @@ export function registerMaterialsRoutes(app: Hono<Env>, deps: Deps) {
       );
       return c.json({ success: true });
     } catch (err: any) {
-      return c.json({ error: err?.message ?? "编辑物料失败" }, 400);
+      return c.json(fail(err?.message ?? "编辑物料失败", 400), 400);
     }
   });
 
@@ -380,7 +383,7 @@ export function registerMaterialsRoutes(app: Hono<Env>, deps: Deps) {
       );
       return c.json({ success: true });
     } catch (err: any) {
-      return c.json({ error: err?.message ?? "删除物料失败" }, 400);
+      return c.json(fail(err?.message ?? "删除物料失败", 400), 400);
     }
   });
 
@@ -392,7 +395,7 @@ export function registerMaterialsRoutes(app: Hono<Env>, deps: Deps) {
       updates?: { category_id?: number | null; unit?: string; source?: string };
     }>();
     if (!Array.isArray(body?.ids) || body.ids.length === 0 || !body?.updates || typeof body.updates !== "object") {
-      return c.json({ error: "请提供 ids 和 updates" }, 400);
+      return c.json(fail("请提供 ids 和 updates", 400), 400);
     }
     try {
       const updates = body.updates;
@@ -410,7 +413,7 @@ export function registerMaterialsRoutes(app: Hono<Env>, deps: Deps) {
         setParts.push("source = ?");
         params.push(deps.cleanOptionalText(updates.source, "source", 120));
       }
-      if (setParts.length === 0) return c.json({ error: "updates 至少需要 category_id、unit 或 source 之一" }, 400);
+      if (setParts.length === 0) return c.json(fail("updates 至少需要 category_id、unit 或 source 之一", 400), 400);
       const ph = body.ids.map(() => "?").join(",");
       await c.env.DB.prepare(`UPDATE materials SET ${setParts.join(", ")} WHERE id IN (${ph})`)
         .bind(...params, ...body.ids)
@@ -424,7 +427,7 @@ export function registerMaterialsRoutes(app: Hono<Env>, deps: Deps) {
       );
       return c.json({ success: true });
     } catch (err: any) {
-      return c.json({ error: err?.message ?? "批量更新物料失败" }, 400);
+      return c.json(fail(err?.message ?? "批量更新物料失败", 400), 400);
     }
   });
 
@@ -464,12 +467,12 @@ export function registerMaterialsRoutes(app: Hono<Env>, deps: Deps) {
       );
       return c.json({ success: true, deletedCount: body.ids.length, deletedMaterials: mats ?? [] });
     } catch (err: any) {
-      return c.json({ error: err?.message ?? "批量删除物料失败" }, 400);
+      return c.json(fail(err?.message ?? "批量删除物料失败", 400), 400);
     }
   });
 
   app.post("/materials/batch-import", async (c) => {
-    const user = await deps.requirePermission(c, "edit_material");
+    const user = await deps.requirePermission(c, "materials_import");
     if (!user) return c.res;
     const body = await c.req.json<{ materials?: any[] }>();
     if (!Array.isArray(body?.materials) || body.materials.length === 0)

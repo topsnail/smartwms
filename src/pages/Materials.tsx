@@ -392,7 +392,7 @@ export default function Materials() {
     setImportPreviewRows(null);
   }, []);
 
-  async function compressImageToDataUrl(file: File, maxWidth: number, maxHeight: number, maxBytes: number): Promise<string> {
+  async function compressImageToBlob(file: File, maxWidth: number, maxHeight: number, maxBytes: number): Promise<Blob> {
     const dataUrl: string = await new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onerror = () => reject(reader.error);
@@ -444,13 +444,7 @@ export default function Materials() {
       throw new Error('图片过大，无法压缩至指定大小，请选择更小的图片');
     }
 
-    const finalDataUrl: string = await new Promise((resolve, reject) => {
-      const r = new FileReader();
-      r.onerror = () => reject(r.error);
-      r.onload = () => resolve(r.result as string);
-      r.readAsDataURL(blob);
-    });
-    return finalDataUrl;
+    return blob;
   }
 
   const handleImageUpload: UploadProps['customRequest'] = useCallback(async (options) => {
@@ -461,12 +455,11 @@ export default function Materials() {
         if (f.size > 3 * 1024 * 1024) {
           throw new Error('原始图片不能超过 3MB');
         }
-        const compressedDataUrl = await compressImageToDataUrl(f, 600, 400, 200 * 1024);
+        const compressedBlob = await compressImageToBlob(f, 600, 400, 200 * 1024);
         const webpName = f.name.replace(/\.[^.]+$/, '') + '.webp';
-        const data = await apiClient.post<{ url?: string }>('/api/upload-image', {
-          filename: webpName,
-          data: compressedDataUrl,
-        });
+        const formData = new FormData();
+        formData.append('file', new File([compressedBlob], webpName, { type: 'image/webp' }));
+        const data = await apiClient.postFormData<{ url?: string }>('/api/upload-image', formData);
         if (data.url) {
           form.setFieldsValue({ image_url: data.url } as any);
         }

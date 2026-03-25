@@ -205,7 +205,9 @@ export default function OperationLogs() {
       .finally(() => setLoading(false));
   }, [actionFilter, actionsFilter, operatorFilter, keywordFilter, clientIpFilter, moduleFilter, dateRange, page, pageSize]);
 
-  React.useEffect(() => { fetchLogs(); }, []);
+  React.useEffect(() => {
+    fetchLogs();
+  }, [fetchLogs]);
 
   React.useEffect(() => {
     setPage(1);

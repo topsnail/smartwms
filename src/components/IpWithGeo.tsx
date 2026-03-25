@@ -2,6 +2,61 @@ import React from "react";
 import { apiClient } from "../api/client";
 
 const geoCache = new Map<string, string | null>();
+const waiters = new Map<string, Array<(location: string | null) => void>>();
+const pendingIps = new Set<string>();
+let flushTimer: number | null = null;
+
+function scheduleFlush() {
+  if (flushTimer != null) return;
+  flushTimer = window.setTimeout(() => {
+    flushTimer = null;
+    void flushBatch();
+  }, 40);
+}
+
+async function flushBatch() {
+  const ips = Array.from(pendingIps);
+  pendingIps.clear();
+  if (!ips.length) return;
+  try {
+    const res = await apiClient.post<{ items: Array<{ ip: string; location: string | null }> }>("/api/ip-geo/batch", { ips });
+    const map = new Map((res.items || []).map((it) => [it.ip, it.location]));
+    for (const ip of ips) {
+      const location = map.has(ip) ? (map.get(ip) ?? null) : null;
+      geoCache.set(ip, location);
+      const ws = waiters.get(ip) || [];
+      waiters.delete(ip);
+      ws.forEach((resolve) => resolve(location));
+    }
+  } catch {
+    await Promise.all(
+      ips.map(async (ip) => {
+        let location: string | null = null;
+        try {
+          const single = await apiClient.get<{ ip: string; location: string | null }>(`/api/ip-geo?ip=${encodeURIComponent(ip)}`);
+          location = single.location;
+        } catch {
+          location = null;
+        }
+        geoCache.set(ip, location);
+        const ws = waiters.get(ip) || [];
+        waiters.delete(ip);
+        ws.forEach((resolve) => resolve(location));
+      })
+    );
+  }
+}
+
+function getGeo(ip: string): Promise<string | null> {
+  if (geoCache.has(ip)) return Promise.resolve(geoCache.get(ip) ?? null);
+  return new Promise((resolve) => {
+    const arr = waiters.get(ip) || [];
+    arr.push(resolve);
+    waiters.set(ip, arr);
+    pendingIps.add(ip);
+    scheduleFlush();
+  });
+}
 
 interface IpWithGeoProps {
   ip: string | null | undefined;
@@ -21,17 +76,14 @@ export function IpWithGeo({ ip, showIp = true }: IpWithGeoProps) {
       setLocation(geoCache.get(raw) ?? null);
       return;
     }
+    let cancelled = false;
     setLocation(undefined);
-    apiClient
-      .get<{ ip: string; location: string | null }>(`/api/ip-geo?ip=${encodeURIComponent(raw)}`)
-      .then((res) => {
-        geoCache.set(raw, res.location);
-        setLocation(res.location);
-      })
-      .catch(() => {
-        geoCache.set(raw, null);
-        setLocation(null);
-      });
+    getGeo(raw).then((loc) => {
+      if (!cancelled) setLocation(loc);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [ip]);
 
   if (!ip) return <span>-</span>;

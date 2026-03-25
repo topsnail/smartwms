@@ -6,6 +6,9 @@ type Deps = {
 };
 
 export function registerReportsRoutes(app: Hono<Env>, deps: Deps) {
+  const fail = (message: string, status = 400) =>
+    ({ success: false, error: { code: status >= 500 ? "INTERNAL_ERROR" : "VALIDATION_FAILED", message } } as const);
+
   app.get("/reports/:type", async (c) => {
     const user = await deps.requirePermission(c, "view_reports");
     if (!user) return c.res;
@@ -13,21 +16,39 @@ export function registerReportsRoutes(app: Hono<Env>, deps: Deps) {
     const url = new URL(c.req.url);
     const start_date = url.searchParams.get("start_date");
     const end_date = url.searchParams.get("end_date");
-    if (!start_date || !end_date) return c.json({ success: false, error: { code: "VALIDATION_FAILED", message: "请提供开始日期和结束日期" } }, 400);
+    if (!start_date || !end_date) return c.json(fail("请提供开始日期和结束日期", 400), 400);
     const start = String(start_date);
     const end = String(end_date) + " 23:59:59";
     try {
       switch (type) {
         case "inventory-turnover": {
           const { results: turnoverData } = await c.env.DB.prepare(`
-          SELECT m.id, m.code, m.name,
-            COALESCE((SELECT SUM(quantity) FROM inventory WHERE material_id = m.id), 0) as ending_stock,
-            COALESCE((SELECT SUM(quantity) FROM transactions WHERE material_id = m.id AND type = 'IN' AND (reverted IS NULL OR reverted = 0) AND timestamp BETWEEN ? AND ?), 0) as inbound,
-            COALESCE((SELECT SUM(quantity) FROM transactions WHERE material_id = m.id AND type = 'OUT' AND (reverted IS NULL OR reverted = 0) AND timestamp BETWEEN ? AND ?), 0) as outbound
-          FROM materials m
-          WHERE m.id IN (SELECT material_id FROM transactions WHERE timestamp BETWEEN ? AND ?)
+          WITH tx AS (
+            SELECT
+              material_id,
+              SUM(CASE WHEN type = 'IN'  AND (reverted IS NULL OR reverted = 0) THEN quantity ELSE 0 END) as inbound,
+              SUM(CASE WHEN type = 'OUT' AND (reverted IS NULL OR reverted = 0) THEN quantity ELSE 0 END) as outbound
+            FROM transactions
+            WHERE timestamp BETWEEN ? AND ?
+            GROUP BY material_id
+          ),
+          inv AS (
+            SELECT material_id, SUM(quantity) as ending_stock
+            FROM inventory
+            GROUP BY material_id
+          )
+          SELECT
+            m.id,
+            m.code,
+            m.name,
+            COALESCE(inv.ending_stock, 0) as ending_stock,
+            COALESCE(tx.inbound, 0) as inbound,
+            COALESCE(tx.outbound, 0) as outbound
+          FROM tx
+          JOIN materials m ON m.id = tx.material_id
+          LEFT JOIN inv ON inv.material_id = tx.material_id
           ORDER BY m.code
-        `).bind(start, end, start, end, start, end).all<Record<string, unknown>>();
+        `).bind(start, end).all<Record<string, unknown>>();
           const data = (turnoverData ?? []).map((item: Record<string, unknown>) => {
             const ending = Number(item.ending_stock ?? 0);
             const inbound = Number(item.inbound ?? 0);
@@ -104,10 +125,10 @@ export function registerReportsRoutes(app: Hono<Env>, deps: Deps) {
           return c.json({ data, summary: { 库存物料数: data.length, 总库存价值: totalVal.toFixed(2) } });
         }
         default:
-          return c.json({ error: "无效的报表类型" }, 404);
+          return c.json(fail("无效的报表类型", 404), 404);
       }
     } catch (err: unknown) {
-      return c.json({ error: err instanceof Error ? err.message : "生成报表失败" }, 500);
+      return c.json(fail(err instanceof Error ? err.message : "生成报表失败", 500), 500);
     }
   });
 }

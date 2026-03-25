@@ -9,8 +9,12 @@ function triggerBrowserDownload(blob: Blob, filename: string) {
   URL.revokeObjectURL(url);
 }
 
-export async function downloadWithAuth(url: string, filename: string): Promise<void> {
-  const blob = await apiClient.getBlob(url);
+export async function downloadWithAuth(
+  url: string,
+  filename: string,
+  opts?: { timeoutMs?: number }
+): Promise<void> {
+  const blob = await apiClient.getBlob(url, { timeoutMs: opts?.timeoutMs ?? 180_000 });
   triggerBrowserDownload(blob, filename);
 }
 

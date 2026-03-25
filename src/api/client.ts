@@ -68,13 +68,28 @@ async function request<T>(
 ): Promise<T> {
   try {
     const fullUrl = url.startsWith("/") ? `${API_BASE}${url}` : url;
+    const providedSignal = (options as any).signal as AbortSignal | undefined;
+    const timeoutMsFromCaller = (options as any).timeoutMs as number | undefined;
+    const timeoutMs =
+      timeoutMsFromCaller ??
+      (responseType === "blob" ? 120_000 : 30_000);
+
+    const controller = providedSignal ? null : new AbortController();
+    const timeoutId =
+      controller && timeoutMs > 0
+        ? window.setTimeout(() => controller?.abort(), timeoutMs)
+        : null;
+
     const res = await fetch(fullUrl, {
       headers: {
         ...(jsonBody ? { "Content-Type": "application/json" } : {}),
         ...buildAuthHeaders(options.headers),
       },
       ...options,
+      signal: controller ? controller.signal : options.signal,
     });
+
+    if (timeoutId) window.clearTimeout(timeoutId);
 
     const data = await readBody(res, responseType);
 
@@ -114,8 +129,17 @@ export const apiClient = {
   },
 
   // 用于导出/下载等二进制响应（同样具备 401 统一处理能力）
-  getBlob(url: string) {
-    return request<Blob>(url, { method: "GET" }, "blob", false);
+  getBlob(url: string, opts?: { timeoutMs?: number; signal?: AbortSignal }) {
+    return request<Blob>(
+      url,
+      {
+        method: "GET",
+        timeoutMs: opts?.timeoutMs,
+        signal: opts?.signal,
+      } as any,
+      "blob",
+      false
+    );
   },
 
   // 用于上传 FormData（不要手动设置 Content-Type，让浏览器自动带 boundary）

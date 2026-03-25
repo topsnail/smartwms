@@ -90,13 +90,16 @@ export default function History() {
       const e = endDateFromUrl ? dayjs(endDateFromUrl) : null;
       setDateRange([s && s.isValid() ? s : null, e && e.isValid() ? e : null]);
     }
-    fetchData(initialType);
   }, []);
 
   // 筛选条件变化时回到第一页
   React.useEffect(() => {
     setPage(1);
   }, [filterType, dateRange, debouncedKeyword]);
+
+  React.useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   // 重新加载数据的函数
   const handleRefresh = () => {
@@ -295,8 +298,6 @@ export default function History() {
                 onChange={(val) => {
                   const next = val as FilterType;
                   setFilterType(next);
-                  // 切换“全部 / 入库 / 出库”时自动刷新列表
-                  fetchData(next);
                 }}
                 options={[
                   { label: '全部', value: 'ALL' },

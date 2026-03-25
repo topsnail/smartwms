@@ -12,6 +12,9 @@ type Deps = {
 };
 
 export function registerRolePermissionRoutes(app: Hono<Env>, deps: Deps) {
+  const fail = (message: string, status = 400, code?: string) =>
+    ({ success: false, error: { code: code || (status >= 500 ? "INTERNAL_ERROR" : "VALIDATION_FAILED"), message } } as const);
+
   app.get("/role-permissions", async (c) => {
     const user = await deps.requirePermission(c, "manage_role_permissions");
     if (!user) return c.res;
@@ -32,7 +35,7 @@ export function registerRolePermissionRoutes(app: Hono<Env>, deps: Deps) {
     if (!user) return c.res;
     const body = await c.req.json<{ permissionsByRole?: Record<string, string[]> }>();
     const permissionsByRole = body?.permissionsByRole;
-    if (!permissionsByRole || typeof permissionsByRole !== "object") return c.json({ error: "参数错误" }, 400);
+    if (!permissionsByRole || typeof permissionsByRole !== "object") return c.json(fail("参数错误", 400), 400);
     const normalize = (arr: unknown): string[] => {
       const a = Array.isArray(arr) ? arr.map(String) : [];
       const filtered = a.map((p) => p.trim()).filter(Boolean).filter((p) => ALLOWED_PERMS.has(p));

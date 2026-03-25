@@ -37,6 +37,9 @@ function toOptionalTrimmedText(value: any, maxLen = 500): string | null {
 }
 
 export function registerTransactionRoutes(app: Hono<Env>, deps: Deps) {
+  const fail = (message: string, status = 400, code?: string) =>
+    ({ success: false, error: { code: code || (status >= 500 ? "INTERNAL_ERROR" : "VALIDATION_FAILED"), message } } as const);
+
   app.get("/transactions", async (c) => {
     const user = await deps.requireAuthUser(c);
     if (!user) return c.res;
@@ -93,14 +96,14 @@ export function registerTransactionRoutes(app: Hono<Env>, deps: Deps) {
     await deps.ensureSchema(c.env.DB);
     const body = await c.req.json<any>();
     const items: any[] = Array.isArray(body?.items) ? body.items : [body];
-    if (items.length === 0) return c.json({ error: "请提供至少一条出入库记录" }, 400);
+    if (items.length === 0) return c.json(fail("请提供至少一条出入库记录", 400), 400);
     const needInbound = items.some((it) => it?.type === "IN");
     const needOutbound = items.some((it) => it?.type === "OUT");
     const perms = user.permissions || [];
     const allowAll = perms.includes("*");
     if (!allowAll) {
-      if (needInbound && !hasPermission(perms, "inbound")) return c.json({ error: "您没有执行入库的权限" }, 403);
-      if (needOutbound && !hasPermission(perms, "outbound")) return c.json({ error: "您没有执行出库的权限" }, 403);
+      if (needInbound && !hasPermission(perms, "inbound")) return c.json(fail("您没有执行入库的权限", 403, "PERMISSION_DENIED"), 403);
+      if (needOutbound && !hasPermission(perms, "outbound")) return c.json(fail("您没有执行出库的权限", 403, "PERMISSION_DENIED"), 403);
     }
 
     const ids: number[] = [];
@@ -117,23 +120,31 @@ export function registerTransactionRoutes(app: Hono<Env>, deps: Deps) {
         const partner_id = toInt(item?.partner_id, "partner_id", { min: 1, allowNull: true });
         const note = toOptionalTrimmedText(item?.note);
 
-        const insertResult = await c.env.DB.prepare("INSERT INTO transactions (type, material_id, location_id, quantity, operator_id, department_id, recipient_id, partner_id, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
-          .bind(type, material_id, location_id, quantity, operator_id ?? null, department_id ?? null, recipient_id ?? null, partner_id ?? null, note ?? null)
-          .run();
-        const txId = insertResult.meta.last_row_id;
-        if (txId) ids.push(Number(txId));
-        if (type === "IN") {
-          await c.env.DB.prepare("INSERT INTO inventory (material_id, location_id, quantity) VALUES (?, ?, ?) ON CONFLICT(material_id, location_id) DO UPDATE SET quantity = quantity + excluded.quantity")
-            .bind(material_id, location_id, quantity)
-            .run();
-        } else {
-          const result = await c.env.DB.prepare("UPDATE inventory SET quantity = quantity - ? WHERE material_id = ? AND location_id = ? AND quantity >= ?")
-            .bind(quantity, material_id, location_id, quantity)
-            .run();
-          if (result.meta.changes === 0) {
-            throw new Error("库存不足：当前库存可能已变化，请刷新后重试");
+        await c.env.DB.exec("BEGIN IMMEDIATE TRANSACTION");
+        let txId: number | null = null;
+        try {
+          if (type === "IN") {
+            await c.env.DB.prepare("INSERT INTO inventory (material_id, location_id, quantity) VALUES (?, ?, ?) ON CONFLICT(material_id, location_id) DO UPDATE SET quantity = quantity + excluded.quantity")
+              .bind(material_id, location_id, quantity)
+              .run();
+          } else {
+            const result = await c.env.DB.prepare("UPDATE inventory SET quantity = quantity - ? WHERE material_id = ? AND location_id = ? AND quantity >= ?")
+              .bind(quantity, material_id, location_id, quantity)
+              .run();
+            if (result.meta.changes === 0) {
+              throw new Error("库存不足：当前库存可能已变化，请刷新后重试");
+            }
           }
+          const insertResult = await c.env.DB.prepare("INSERT INTO transactions (type, material_id, location_id, quantity, operator_id, department_id, recipient_id, partner_id, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
+            .bind(type, material_id, location_id, quantity, operator_id ?? null, department_id ?? null, recipient_id ?? null, partner_id ?? null, note ?? null)
+            .run();
+          txId = Number(insertResult.meta.last_row_id ?? 0) || null;
+          await c.env.DB.exec("COMMIT");
+        } catch (e) {
+          await c.env.DB.exec("ROLLBACK");
+          throw e;
         }
+        if (txId) ids.push(txId);
         const material = await c.env.DB.prepare("SELECT name FROM materials WHERE id = ?").bind(material_id).first<any>();
         const location = await c.env.DB.prepare("SELECT name FROM locations WHERE id = ?").bind(location_id).first<any>();
         const operator = operator_id ? (await c.env.DB.prepare("SELECT name FROM staff WHERE id = ?").bind(operator_id).first<any>()) : null;
@@ -141,7 +152,7 @@ export function registerTransactionRoutes(app: Hono<Env>, deps: Deps) {
       }
       return c.json({ success: true, ids: ids.length === 1 ? ids[0] : ids });
     } catch (err: any) {
-      return c.json({ error: err?.message ?? "操作失败" }, 400);
+      return c.json(fail(err?.message ?? "操作失败", 400), 400);
     }
   });
 
@@ -151,39 +162,44 @@ export function registerTransactionRoutes(app: Hono<Env>, deps: Deps) {
     const id = c.req.param("id");
     try {
       const row = await c.env.DB.prepare("SELECT * FROM transactions WHERE id = ? AND (reverted IS NULL OR reverted = 0)").bind(id).first<any>();
-      if (!row) return c.json({ error: "记录不存在或已撤销" }, 404);
+      if (!row) return c.json(fail("记录不存在或已撤销", 404, "NOT_FOUND"), 404);
       const perms = user.permissions || [];
       const allowAll = perms.includes("*");
       if (!allowAll) {
-        if (row.type === "IN" && !hasPermission(perms, "inbound")) return c.json({ error: "您没有执行入库的权限" }, 403);
-        if (row.type === "OUT" && !hasPermission(perms, "outbound")) return c.json({ error: "您没有执行出库的权限" }, 403);
+        if (!hasPermission(perms, "transactions_undo")) return c.json(fail("您没有撤销出入库记录的权限", 403, "PERMISSION_DENIED"), 403);
+        if (row.type === "IN" && !hasPermission(perms, "inbound")) return c.json(fail("您没有执行入库的权限", 403, "PERMISSION_DENIED"), 403);
+        if (row.type === "OUT" && !hasPermission(perms, "outbound")) return c.json(fail("您没有执行出库的权限", 403, "PERMISSION_DENIED"), 403);
       }
       const diff = Date.now() - new Date(row.timestamp).getTime();
-      if (diff > 5 * 60 * 1000) return c.json({ error: "该记录已超过 5 分钟，无法撤销" }, 400);
+      if (diff > 5 * 60 * 1000) return c.json(fail("该记录已超过 5 分钟，无法撤销", 400), 400);
       const reverseType = row.type === "IN" ? "OUT" : "IN";
-
-      await c.env.DB.batch([
-        c.env.DB.prepare("UPDATE transactions SET reverted = 1 WHERE id = ?").bind(id),
-        c.env.DB.prepare("INSERT INTO transactions (type, material_id, location_id, quantity, operator_id, department_id, recipient_id, partner_id, note, revert_transaction_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-          .bind(reverseType, row.material_id, row.location_id, row.quantity, row.operator_id, row.department_id, row.recipient_id, row.partner_id ?? null, `撤销原记录#${id}`, id),
-      ]);
-      const revRow = await c.env.DB.prepare("SELECT id FROM transactions ORDER BY id DESC LIMIT 1").first<{ id: number }>();
-      if (revRow?.id) await c.env.DB.prepare("UPDATE transactions SET revert_transaction_id = ? WHERE id = ?").bind(revRow.id, id).run();
-      if (reverseType === "IN") {
-        const cur = await c.env.DB.prepare("SELECT quantity FROM inventory WHERE material_id = ? AND location_id = ?").bind(row.material_id, row.location_id).first<any>();
-        if (cur) {
-          await c.env.DB.prepare("UPDATE inventory SET quantity = quantity + ? WHERE material_id = ? AND location_id = ?").bind(row.quantity, row.material_id, row.location_id).run();
-        } else {
-          await c.env.DB.prepare("INSERT INTO inventory (material_id, location_id, quantity) VALUES (?, ?, ?)").bind(row.material_id, row.location_id, row.quantity).run();
-        }
-      } else {
-        await c.env.DB.prepare("UPDATE inventory SET quantity = quantity - ? WHERE material_id = ? AND location_id = ?").bind(row.quantity, row.material_id, row.location_id).run();
+      await c.env.DB.exec("BEGIN IMMEDIATE TRANSACTION");
+      const markResult = await c.env.DB.prepare("UPDATE transactions SET reverted = 1 WHERE id = ? AND (reverted IS NULL OR reverted = 0)").bind(id).run();
+      if (markResult.meta.changes === 0) throw new Error("记录不存在或已撤销");
+      const insertResult = await c.env.DB.prepare("INSERT INTO transactions (type, material_id, location_id, quantity, operator_id, department_id, recipient_id, partner_id, note, revert_transaction_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+        .bind(reverseType, row.material_id, row.location_id, row.quantity, row.operator_id, row.department_id, row.recipient_id, row.partner_id ?? null, `撤销原记录#${id}`, id)
+        .run();
+      const reverseId = Number(insertResult.meta.last_row_id ?? 0);
+      if (reverseId > 0) {
+        await c.env.DB.prepare("UPDATE transactions SET revert_transaction_id = ? WHERE id = ?").bind(reverseId, id).run();
       }
+      if (reverseType === "IN") {
+        await c.env.DB.prepare("INSERT INTO inventory (material_id, location_id, quantity) VALUES (?, ?, ?) ON CONFLICT(material_id, location_id) DO UPDATE SET quantity = quantity + excluded.quantity")
+          .bind(row.material_id, row.location_id, row.quantity)
+          .run();
+      } else {
+        const deductResult = await c.env.DB.prepare("UPDATE inventory SET quantity = quantity - ? WHERE material_id = ? AND location_id = ? AND quantity >= ?")
+          .bind(row.quantity, row.material_id, row.location_id, row.quantity)
+          .run();
+        if (deductResult.meta.changes === 0) throw new Error("撤销失败：当前库存不足，无法回滚该记录");
+      }
+      await c.env.DB.exec("COMMIT");
       const material = await c.env.DB.prepare("SELECT name FROM materials WHERE id = ?").bind(row.material_id).first<any>();
       await deps.addOperationLog(c.env.DB, "REVERT_TRANSACTION", `撤销${row.type === "IN" ? "入库" : "出库"}记录#${id}：${material?.name ?? "未知"}`, user.displayName || user.username, { clientIp: deps.getClientIp(c) });
       return c.json({ success: true });
     } catch (err: any) {
-      return c.json({ error: err?.message ?? "撤销失败" }, 400);
+      try { await c.env.DB.exec("ROLLBACK"); } catch {}
+      return c.json(fail(err?.message ?? "撤销失败", 400), 400);
     }
   });
 }

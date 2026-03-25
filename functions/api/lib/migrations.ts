@@ -30,6 +30,18 @@ const MIGRATIONS: Migration[] = [
       }
     },
   },
+  {
+    id: 3,
+    name: "query_performance_indexes",
+    up: async (db) => {
+      await db.prepare("CREATE INDEX IF NOT EXISTS idx_transactions_ts_reverted_type ON transactions(timestamp, reverted, type)").run();
+      await db.prepare("CREATE INDEX IF NOT EXISTS idx_transactions_material_ts ON transactions(material_id, timestamp)").run();
+      await db.prepare("CREATE INDEX IF NOT EXISTS idx_transactions_location_ts ON transactions(location_id, timestamp)").run();
+      await db.prepare("CREATE INDEX IF NOT EXISTS idx_transactions_partner_ts ON transactions(partner_id, timestamp)").run();
+      await db.prepare("CREATE INDEX IF NOT EXISTS idx_operation_logs_created_at ON operation_logs(created_at DESC)").run();
+      await db.prepare("CREATE INDEX IF NOT EXISTS idx_operation_logs_action_created_at ON operation_logs(action, created_at DESC)").run();
+    },
+  },
 ];
 
 const TABLE_NAME = "schema_migrations";

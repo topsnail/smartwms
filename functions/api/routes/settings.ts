@@ -35,13 +35,16 @@ type Deps = {
 };
 
 export function registerSettingsRoutes(app: Hono<Env>, deps: Deps) {
+  const fail = (message: string, status = 400, code?: string) =>
+    ({ success: false, error: { code: code || (status >= 500 ? "INTERNAL_ERROR" : "VALIDATION_FAILED"), message } } as const);
+
   app.get("/settings/:type", async (c) => {
     const user = await deps.requireAuthUser(c);
     if (!user) return c.res;
     await deps.ensureSchema(c.env.DB);
     const type = c.req.param("type");
     const table = SETTINGS_TABLES[type];
-    if (!table) return c.json({ error: "无效的类型" }, 404);
+    if (!table) return c.json(fail("无效的类型", 404, "NOT_FOUND"), 404);
     const { results } = await c.env.DB.prepare(`SELECT * FROM ${table} ORDER BY id ASC`).all<BaseDataRow>();
     return c.json(results ?? []);
   });
@@ -53,7 +56,7 @@ export function registerSettingsRoutes(app: Hono<Env>, deps: Deps) {
     const type = c.req.param("type");
     const body = await c.req.json<{ name?: string; role?: string; parent_id?: number; description?: string; invoice_info?: string; contact?: string; mailing_address?: string }>();
     const name = String(body?.name ?? "").trim();
-    if (!name || name.length > 50) return c.json({ error: "名称不能为空或过长" }, 400);
+    if (!name || name.length > 50) return c.json(fail("名称不能为空或过长", 400), 400);
     const op = user.displayName || user.username;
     const ip = deps.getClientIp(c);
     try {
@@ -105,11 +108,11 @@ export function registerSettingsRoutes(app: Hono<Env>, deps: Deps) {
         lastId = r.meta.last_row_id;
         await deps.addOperationLog(c.env.DB, "CREATE_PARTNER", `新增往来单位：${name}`, op, { clientIp: ip });
       } else {
-        return c.json({ error: "无效的类型" }, 404);
+        return c.json(fail("无效的类型", 404, "NOT_FOUND"), 404);
       }
       return c.json({ success: true, id: lastId });
     } catch (err: unknown) {
-      return c.json({ error: err instanceof Error ? err.message : "新增失败" }, 400);
+      return c.json(fail(err instanceof Error ? err.message : "新增失败", 400), 400);
     }
   });
 
@@ -120,9 +123,9 @@ export function registerSettingsRoutes(app: Hono<Env>, deps: Deps) {
     const id = c.req.param("id");
     const body = await c.req.json<{ name?: string; role?: string; parent_id?: number; description?: string; invoice_info?: string; contact?: string; mailing_address?: string }>();
     const name = String(body?.name ?? "").trim();
-    if (!name || name.length > 50) return c.json({ error: "名称不能为空或过长" }, 400);
+    if (!name || name.length > 50) return c.json(fail("名称不能为空或过长", 400), 400);
     const table = SETTINGS_TABLES[type];
-    if (!table) return c.json({ error: "无效的类型" }, 404);
+    if (!table) return c.json(fail("无效的类型", 404, "NOT_FOUND"), 404);
     try {
       if (await existsName(c.env.DB, table, name, Number(id))) throw new Error("名称已存在");
       if (type === "locations") await c.env.DB.prepare("UPDATE locations SET name = ? WHERE id = ?").bind(name, id).run();
@@ -143,7 +146,7 @@ export function registerSettingsRoutes(app: Hono<Env>, deps: Deps) {
       }
       return c.json({ success: true });
     } catch (err: unknown) {
-      return c.json({ error: err instanceof Error ? err.message : "编辑失败" }, 400);
+      return c.json(fail(err instanceof Error ? err.message : "编辑失败", 400), 400);
     }
   });
 
@@ -153,37 +156,37 @@ export function registerSettingsRoutes(app: Hono<Env>, deps: Deps) {
     const type = c.req.param("type");
     const id = c.req.param("id");
     const table = SETTINGS_TABLES[type];
-    if (!table) return c.json({ error: "无效的类型" }, 404);
+    if (!table) return c.json(fail("无效的类型", 404, "NOT_FOUND"), 404);
     try {
       const row = await c.env.DB.prepare(`SELECT name FROM ${table} WHERE id = ?`).bind(id).first<{ name: string }>();
-      if (!row) return c.json({ error: "记录不存在" }, 404);
+      if (!row) return c.json(fail("记录不存在", 404, "NOT_FOUND"), 404);
       if (type === "locations") {
         const usedInv = (await c.env.DB.prepare("SELECT COUNT(*) as c FROM inventory WHERE location_id = ?").bind(id).first<{ c: number }>())?.c ?? 0;
         const usedTx = (await c.env.DB.prepare("SELECT COUNT(*) as c FROM transactions WHERE location_id = ?").bind(id).first<{ c: number }>())?.c ?? 0;
-        if (usedInv > 0 || usedTx > 0) return c.json({ error: "该库位已被库存或出入库记录引用" }, 400);
+        if (usedInv > 0 || usedTx > 0) return c.json(fail("该库位已被库存或出入库记录引用", 400), 400);
       } else if (type === "units") {
         const used = (await c.env.DB.prepare("SELECT COUNT(*) as c FROM materials WHERE unit = ?").bind(row.name).first<{ c: number }>())?.c ?? 0;
-        if (used > 0) return c.json({ error: `该单位已被 ${used} 个物料使用` }, 400);
+        if (used > 0) return c.json(fail(`该单位已被 ${used} 个物料使用`, 400), 400);
       } else if (type === "staff") {
         const used = (await c.env.DB.prepare("SELECT COUNT(*) as c FROM transactions WHERE operator_id = ? OR recipient_id = ?").bind(id, id).first<{ c: number }>())?.c ?? 0;
-        if (used > 0) return c.json({ error: "该人员已被出入库记录引用" }, 400);
+        if (used > 0) return c.json(fail("该人员已被出入库记录引用", 400), 400);
       } else if (type === "departments") {
         const used = (await c.env.DB.prepare("SELECT COUNT(*) as c FROM transactions WHERE department_id = ?").bind(id).first<{ c: number }>())?.c ?? 0;
-        if (used > 0) return c.json({ error: "该部门已被出入库记录引用" }, 400);
+        if (used > 0) return c.json(fail("该部门已被出入库记录引用", 400), 400);
       } else if (type === "sources") {
         const used = (await c.env.DB.prepare("SELECT COUNT(*) as c FROM materials WHERE source = ?").bind(row.name).first<{ c: number }>())?.c ?? 0;
-        if (used > 0) return c.json({ error: `该来源已被 ${used} 个物料使用` }, 400);
+        if (used > 0) return c.json(fail(`该来源已被 ${used} 个物料使用`, 400), 400);
       } else if (type === "categories") {
         await c.env.DB.prepare("UPDATE materials SET category_id = NULL WHERE category_id = ?").bind(id).run();
         await c.env.DB.prepare("UPDATE material_categories SET parent_id = NULL WHERE parent_id = ?").bind(id).run();
       } else if (type === "partners") {
         const used = (await c.env.DB.prepare("SELECT COUNT(*) as c FROM transactions WHERE partner_id = ?").bind(id).first<{ c: number }>())?.c ?? 0;
-        if (used > 0) return c.json({ error: "该往来单位已被出入库记录引用" }, 400);
+        if (used > 0) return c.json(fail("该往来单位已被出入库记录引用", 400), 400);
       }
       await c.env.DB.prepare(`DELETE FROM ${table} WHERE id = ?`).bind(id).run();
       return c.json({ success: true });
     } catch (err: unknown) {
-      return c.json({ error: err instanceof Error ? err.message : "删除失败" }, 400);
+      return c.json(fail(err instanceof Error ? err.message : "删除失败", 400), 400);
     }
   });
 }

@@ -19,6 +19,9 @@ type Deps = {
 };
 
 export function registerInventoryRoutes(app: Hono<Env>, deps: Deps) {
+  const fail = (message: string, status = 400, code?: string) =>
+    ({ success: false, error: { code: code || (status >= 500 ? "INTERNAL_ERROR" : "VALIDATION_FAILED"), message } } as const);
+
   app.get("/inventory", async (c) => {
     const user = await deps.requireAuthUser(c);
     if (!user) return c.res;
@@ -69,7 +72,7 @@ export function registerInventoryRoutes(app: Hono<Env>, deps: Deps) {
     const material_id = url.searchParams.get("material_id");
     const location_id = url.searchParams.get("location_id");
     if (!material_id || !location_id) {
-      return c.json({ error: "需要 material_id 和 location_id" }, 400);
+      return c.json(fail("需要 material_id 和 location_id", 400), 400);
     }
     const row = await c.env.DB
       .prepare("SELECT quantity FROM inventory WHERE material_id = ? AND location_id = ?")
@@ -104,7 +107,7 @@ export function registerInventoryRoutes(app: Hono<Env>, deps: Deps) {
       );
       return c.json({ success: true });
     } catch (err: any) {
-      return c.json({ error: err?.message ?? "更新库存预警阈值失败" }, 400);
+      return c.json(fail(err?.message ?? "更新库存预警阈值失败", 400), 400);
     }
   });
 }

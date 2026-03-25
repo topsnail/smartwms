@@ -18,6 +18,7 @@ export type D1PreparedStatement = {
 export type D1Database = {
   prepare(query: string): D1PreparedStatement;
   batch<T = unknown>(statements: D1PreparedStatement[]): Promise<D1Result<T>[]>;
+  exec(query: string): Promise<unknown>;
 };
 
 export type R2Bucket = {
@@ -30,6 +31,9 @@ export type Bindings = {
   R2_BUCKET?: R2Bucket;
   JWT_SECRET?: string;
   JWT_EXPIRES_IN?: string;
+  LOGIN_MAX_ATTEMPTS?: string;
+  LOGIN_WINDOW_MINUTES?: string;
+  LOGIN_LOCK_MINUTES?: string;
 };
 
 export type Env = {
