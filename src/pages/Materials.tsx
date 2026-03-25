@@ -7,7 +7,7 @@ import type { UploadProps } from 'antd';
 import { apiClient } from '../api/client';
 import { Package as PackageIcon } from 'lucide-react';
 import { PageHeader } from '../components/PageHeader';
-import { DEFAULT_DEBOUNCE_MS, DEFAULT_PAGE_SIZE_OPTIONS } from '../constants/table';
+import { DEFAULT_DEBOUNCE_MS, DEFAULT_PAGE_SIZE, DEFAULT_PAGE_SIZE_OPTIONS } from '../constants/table';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { useColumnVisibility } from '../hooks/useColumnVisibility';
 import { ColumnVisibilityPopover } from '../components/ColumnVisibilityPopover';
@@ -23,6 +23,7 @@ import {
   batchImportMaterials,
   canDeleteMaterial,
   checkMaterialCode,
+  checkMaterialName,
   batchUpdateMaterials,
   type Material, 
   type SaveMaterialInput 
@@ -89,11 +90,17 @@ export default function Materials() {
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
-  const [importResult, setImportResult] = useState<{ success: boolean; successCount: number; failedCount: number; failedItems: { item: SaveMaterialInput; error: string }[] } | null>(null);
+  const [importResult, setImportResult] = useState<{
+    success: boolean;
+    successCount: number;
+    failedCount: number;
+    skippedCount?: number;
+    failedItems: { item: SaveMaterialInput; error: string }[];
+  } | null>(null);
   const [importPreviewRows, setImportPreviewRows] = useState<SaveMaterialInput[] | null>(null);
   const [inventoryList, setInventoryList] = useState<InventoryItem[]>([]);
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   /** 高级筛选：null/'' 表示“全部”，与下拉首项一致 */
   const [filterCategoryId, setFilterCategoryId] = useState<number | null>(null);
   const [filterSource, setFilterSource] = useState<string | null>(null);
@@ -344,7 +351,8 @@ export default function Materials() {
       }
       const res = await batchImportMaterials(materials);
       setImportResult(res);
-      message.success(`导入完成：成功 ${res.successCount} 个，失败 ${res.failedCount} 个`);
+      const skipped = res.skippedCount ?? 0;
+      message.success(`导入完成：成功 ${res.successCount} 个，跳过 ${skipped} 个，失败 ${res.failedCount} 个`);
       fetchMaterials();
     } catch (error: any) {
       notifyError(error?.message || '导入物料失败');
@@ -919,6 +927,17 @@ export default function Materials() {
             rules={[
               { required: true, message: '请输入物料名称' },
               { max: 120, message: '名称最长 120 个字符' },
+              {
+                validator: async (_, value) => {
+                  const v = (value || '').toString().trim();
+                  if (!v) return Promise.resolve();
+                  const res = await checkMaterialName(v, editingId ?? undefined);
+                  if (!res.available) {
+                    return Promise.reject(new Error(res.error || '该物料名称已存在'));
+                  }
+                  return Promise.resolve();
+                },
+              },
             ]}
           >
             <Input placeholder="如：螺栓" />

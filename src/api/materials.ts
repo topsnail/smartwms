@@ -61,6 +61,13 @@ export function checkMaterialCode(code: string, excludeId?: number) {
   return apiClient.get<{ available: boolean; error?: string }>(`/api/materials/check-code?${params}`);
 }
 
+export function checkMaterialName(name: string, excludeId?: number) {
+  const params = new URLSearchParams();
+  params.set('name', name);
+  if (excludeId != null) params.set('exclude_id', String(excludeId));
+  return apiClient.get<{ available: boolean; error?: string }>(`/api/materials/check-name?${params}`);
+}
+
 export function canDeleteMaterial(id: number) {
   return apiClient.get<{ canDelete: boolean; stockTotal: number; transactionCount: number; reason?: string }>(`/api/materials/${id}/can-delete`);
 }
@@ -80,6 +87,12 @@ export async function exportMaterials(): Promise<Blob> {
 }
 
 export function batchImportMaterials(materials: SaveMaterialInput[]) {
-  return apiClient.post<{ success: boolean; successCount: number; failedCount: number; failedItems: { item: SaveMaterialInput; error: string }[] }>('/api/materials/batch-import', { materials });
+  return apiClient.post<{
+    success: boolean;
+    successCount: number;
+    failedCount: number;
+    failedItems: { item: SaveMaterialInput; error: string }[];
+    skippedCount?: number;
+  }>('/api/materials/batch-import', { materials });
 }
 

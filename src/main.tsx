@@ -1,6 +1,6 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { ConfigProvider } from 'antd';
+import { ConfigProvider, message } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
 import dayjs from 'dayjs';
 import 'dayjs/locale/zh-cn';
@@ -10,6 +10,9 @@ import './index.css';
 
 // 日期选择器、月份、星期等统一使用中文
 dayjs.locale('zh-cn');
+
+// 全局消息提示统一持续 3 秒
+message.config({ duration: 3 });
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

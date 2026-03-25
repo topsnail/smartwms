@@ -158,6 +158,32 @@ export function registerMaterialsRoutes(app: Hono<Env>, deps: Deps) {
     return c.json({ available: !row });
   });
 
+  app.get("/materials/check-name", async (c) => {
+    const user = await deps.requireAuthUser(c);
+    if (!user) return c.res;
+    const url = new URL(c.req.url);
+    const name = url.searchParams.get("name");
+    const exclude_id = url.searchParams.get("exclude_id");
+    if (!name || !String(name).trim()) return c.json({ available: true });
+
+    const n2 = String(name).trim();
+    const excludeId = exclude_id ? parseInt(String(exclude_id), 10) : null;
+
+    let row: { id: number } | null = null;
+    if (Number.isFinite(excludeId) && (excludeId as number) > 0) {
+      row = await c.env.DB
+        .prepare("SELECT id FROM materials WHERE lower(name) = lower(?) AND id != ?")
+        .bind(n2, excludeId)
+        .first<{ id: number }>();
+    } else {
+      row = await c.env.DB
+        .prepare("SELECT id FROM materials WHERE lower(name) = lower(?)")
+        .bind(n2)
+        .first<{ id: number }>();
+    }
+    return c.json({ available: !row });
+  });
+
   app.get("/materials/:id/can-delete", async (c) => {
     const user = await deps.requireAuthUser(c);
     if (!user) return c.res;
@@ -248,6 +274,11 @@ export function registerMaterialsRoutes(app: Hono<Env>, deps: Deps) {
           .first<{ id: number }>();
         if (existing) throw new Error(`物料编码「${finalCode}」已存在`);
       }
+      const existingByName = await c.env.DB
+        .prepare("SELECT id FROM materials WHERE lower(name) = lower(?)")
+        .bind(cleanName)
+        .first<{ id: number }>();
+      if (existingByName) throw new Error(`物料名称「${cleanName}」已存在`);
       const r = await c.env.DB.prepare(
         "INSERT INTO materials (code, name, spec, unit, category_id, image_url, source, purchase_price, sale_price) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
       )
@@ -309,6 +340,11 @@ export function registerMaterialsRoutes(app: Hono<Env>, deps: Deps) {
           .first<{ id: number }>();
         if (existing) throw new Error(`物料编码「${finalCode}」已被其他物料使用`);
       }
+      const existingByName = await c.env.DB
+        .prepare("SELECT id FROM materials WHERE lower(name) = lower(?) AND id != ?")
+        .bind(cleanName, id)
+        .first<{ id: number }>();
+      if (existingByName) throw new Error(`物料名称「${cleanName}」已被其他物料使用`);
       const old = await c.env.DB
         .prepare("SELECT code, name, spec, unit, category_id, source, purchase_price, sale_price FROM materials WHERE id = ?")
         .bind(id)
@@ -484,9 +520,28 @@ export function registerMaterialsRoutes(app: Hono<Env>, deps: Deps) {
       );
     let successCount = 0;
     const failedItems: { item: any; error: string }[] = [];
+    let skippedCount = 0;
+    const normalizedItems: Array<{
+      raw: any;
+      code: string;
+      name: string;
+      nameKeyLower: string;
+      spec: string | null;
+      unit: string | null;
+      category_id: number | null;
+      image_url: string | null;
+      source: string | null;
+      purchase_price: number | null;
+      sale_price: number | null;
+    }> = [];
+
+    // 1) 批内校验 + 去重（仅对 code != '-' 生效）
+    const seenInBatch = new Set<string>();
+    const seenNameInBatch = new Set<string>();
     for (const item of body.materials) {
       try {
         const cleanName = deps.cleanRequiredText(item?.name, "name", 120);
+        const nameKeyLower = cleanName.toLowerCase();
         const cleanCode = deps.cleanOptionalText(item?.code, "code", 64);
         const cleanSpec = deps.cleanOptionalText(item?.spec, "spec", 200);
         const cleanUnit = deps.cleanOptionalText(item?.unit, "unit", 50);
@@ -495,38 +550,98 @@ export function registerMaterialsRoutes(app: Hono<Env>, deps: Deps) {
         const cleanPurchase = deps.cleanOptionalNonNegativeNumber(item?.purchase_price);
         const cleanSale = deps.cleanOptionalNonNegativeNumber(item?.sale_price);
         const cleanImageUrl = deps.cleanOptionalText(item?.image_url, "image_url", 300);
+
         const finalCode = cleanCode || "-";
         if (finalCode !== "-") {
-          const existsCode = await c.env.DB
-            .prepare("SELECT id FROM materials WHERE code = ?")
-            .bind(finalCode)
-            .first<{ id: number }>();
-          if (existsCode) throw new Error(`编码「${finalCode}」已存在`);
+          if (seenInBatch.has(finalCode)) {
+            skippedCount++;
+            continue;
+          }
+          seenInBatch.add(finalCode);
         }
-        await c.env.DB.prepare(
-          "INSERT INTO materials (code, name, spec, unit, category_id, image_url, source, purchase_price, sale_price) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
-        )
-          .bind(
-            finalCode,
-            cleanName,
-            cleanSpec,
-            cleanUnit,
-            cleanCategoryId ?? null,
-            cleanImageUrl,
-            cleanSource,
-            cleanPurchase,
-            cleanSale
-          )
-          .run();
-        successCount++;
+
+        if (seenNameInBatch.has(nameKeyLower)) {
+          skippedCount++;
+          continue;
+        }
+        seenNameInBatch.add(nameKeyLower);
+
+        normalizedItems.push({
+          raw: item,
+          code: finalCode,
+          name: cleanName,
+          nameKeyLower,
+          spec: cleanSpec,
+          unit: cleanUnit,
+          category_id: cleanCategoryId ?? null,
+          image_url: cleanImageUrl,
+          source: cleanSource,
+          purchase_price: cleanPurchase,
+          sale_price: cleanSale,
+        });
       } catch (err: any) {
         failedItems.push({ item, error: err?.message ?? "未知错误" });
       }
     }
+
+    // 2) 批量查询：数据库中已存在的 code（仅对 code != '-' 生效）
+    const codesToCheck = Array.from(seenInBatch).filter((code) => code && code !== "-");
+    const existingCodes = new Set<string>();
+    if (codesToCheck.length > 0) {
+      const ph = codesToCheck.map(() => "?").join(",");
+      const rows = await c.env.DB
+        .prepare(`SELECT code FROM materials WHERE code IN (${ph})`)
+        .bind(...codesToCheck)
+        .all<{ code: string }>();
+      for (const r of rows.results ?? []) {
+        if (r?.code) existingCodes.add(String(r.code));
+      }
+    }
+
+    const existingNames = new Set<string>();
+    const namesToCheck = Array.from(seenNameInBatch);
+    if (namesToCheck.length > 0) {
+      const ph = namesToCheck.map(() => "?").join(",");
+      const rows = await c.env.DB
+        .prepare(`SELECT name FROM materials WHERE lower(name) IN (${ph})`)
+        .bind(...namesToCheck)
+        .all<{ name: string }>();
+      for (const r of rows.results ?? []) {
+        if (r?.name) existingNames.add(String(r.name).toLowerCase());
+      }
+    }
+
+    // 3) 插入：存在则跳过（计入 skippedCount），不存在则插入
+    for (const ni of normalizedItems) {
+      if (ni.code !== "-" && existingCodes.has(ni.code)) {
+        skippedCount++;
+        continue;
+      }
+      if (existingNames.has(ni.nameKeyLower)) {
+        skippedCount++;
+        continue;
+      }
+      await c.env.DB.prepare(
+        "INSERT INTO materials (code, name, spec, unit, category_id, image_url, source, purchase_price, sale_price) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+      )
+        .bind(
+          ni.code,
+          ni.name,
+          ni.spec,
+          ni.unit,
+          ni.category_id,
+          ni.image_url,
+          ni.source,
+          ni.purchase_price,
+          ni.sale_price
+        )
+        .run();
+      successCount++;
+    }
     await deps.addOperationLog(
       c.env.DB,
       "BATCH_IMPORT_MATERIAL",
-      `批量导入物料：成功 ${successCount} 个，失败 ${failedItems.length} 个`,
+      `批量导入物料：成功 ${successCount} 个，跳过 ${skippedCount} 个，失败 ${failedItems.length} 个`,
       user.displayName || user.username,
       { clientIp: deps.getClientIp(c) }
     );
@@ -535,6 +650,7 @@ export function registerMaterialsRoutes(app: Hono<Env>, deps: Deps) {
       successCount,
       failedCount: failedItems.length,
       failedItems,
+      skippedCount,
     });
   });
 }

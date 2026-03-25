@@ -132,6 +132,18 @@
     border-bottom: 1px solid rgba(226, 232, 240, 0.9);
   }
 
+  /* 表格行高统一：减少 padding + 收紧 line-height，便于同屏显示更多行 */
+  .ant-table-wrapper .ant-table-thead > tr > th {
+    padding: 6px 8px !important;
+    line-height: 20px !important;
+    vertical-align: middle !important;
+  }
+  .ant-table-wrapper .ant-table-tbody > tr > td {
+    padding: 4px 8px !important;
+    line-height: 20px !important;
+    vertical-align: middle !important;
+  }
+
   .ant-table-wrapper .ant-table-tbody > tr:hover > td {
     background: var(--wms-primary-soft) !important;
   }

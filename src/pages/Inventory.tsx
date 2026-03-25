@@ -203,19 +203,6 @@ export default function Inventory() {
       ),
     },
     {
-      title: '库位',
-      dataIndex: 'location_name',
-      key: 'location_name',
-      align: colAlign,
-      fixed: 'left',
-      render: (text: string) => (
-        <Space>
-          <EnvironmentOutlined style={{ color: '#1677ff' }} />
-          <span>{text}</span>
-        </Space>
-      ),
-    },
-    {
       title: '物料编码',
       dataIndex: 'code',
       key: 'code',
@@ -287,24 +274,38 @@ export default function Inventory() {
       },
     },
     {
+      title: '库位',
+      dataIndex: 'location_name',
+      key: 'location_name',
+      align: colAlign,
+      render: (text: string) => (
+        <Space>
+          <EnvironmentOutlined style={{ color: '#1677ff' }} />
+          <span>{text}</span>
+        </Space>
+      ),
+    },
+    {
       title: '预警阈值',
       key: 'alert_threshold',
       align: colAlign,
       render: (_: unknown, record: InventoryItem) => (
-        <Space orientation="vertical" size="small">
-          <div>
-            <Tag color={record.min_stock > 0 ? 'orange' : 'default'}>最小: {record.min_stock || 0}</Tag>
-            <Tag color={record.max_stock > 0 ? 'blue' : 'default'}>最大: {record.max_stock || 0}</Tag>
-          </div>
+        <Space size="small" align="center" wrap>
+          <Tag size="small" color={record.min_stock > 0 ? 'orange' : 'default'}>
+            最小: {record.min_stock || 0}
+          </Tag>
+          <Tag size="small" color={record.max_stock > 0 ? 'blue' : 'default'}>
+            最大: {record.max_stock || 0}
+          </Tag>
           {can('inventory_alert_edit') && (
             <Button
               type="link"
               size="small"
               icon={<EditOutlined />}
               onClick={() => openAlertModal(record)}
-            >
-              设置
-            </Button>
+              aria-label="编辑预警阈值"
+              style={{ paddingInline: 6 }}
+            />
           )}
         </Space>
       ),

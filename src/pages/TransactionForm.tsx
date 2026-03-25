@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { ArrowDownLeft, ArrowUpRight, CheckCircle2, AlertCircle, RotateCcw } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Button, Form, InputNumber, message, Modal, Empty, Select, Table, Skeleton } from 'antd';
-import { getStock } from '../api/inventory';
+import { getInventory, getStock } from '../api/inventory';
 import { createTransaction, undoTransaction, getTransactions, type Transaction } from '../api/transactions';
 import { createMaterial, type Material } from '../api/materials';
 import { apiClient } from '../api/client';
@@ -28,6 +28,7 @@ export default function TransactionForm({ type }: { type: 'IN' | 'OUT' }) {
   const [status, setStatus] = React.useState<{ type: 'success' | 'error', message: string } | null>(null);
   const [lastTxId, setLastTxId] = React.useState<number | null>(null);
   const [currentStock, setCurrentStock] = React.useState<number | null>(null);
+  const [materialDefaultLocation, setMaterialDefaultLocation] = React.useState<Record<string, { location_id: string; location_name: string }>>({});
 
   const [formData, setFormData] = React.useState({
     material_id: '',
@@ -58,6 +59,10 @@ export default function TransactionForm({ type }: { type: 'IN' | 'OUT' }) {
     recipient: '',
     partner: ''
   });
+
+  // 仅用于 IN 场景：标记当前“存放位置”是否由上一次选择物料自动填充。
+  // 用户手动修改库位后会清除标记；切换物料时如果仍是自动填充，则会联动覆盖为新物料的默认库位。
+  const [locationAutoByMaterial, setLocationAutoByMaterial] = React.useState<string | null>(null);
 
   type SuggestionItem = { id: number; name: string };
   const [suggestions, setSuggestions] = React.useState<Record<string, SuggestionItem[]>>({
@@ -135,6 +140,38 @@ export default function TransactionForm({ type }: { type: 'IN' | 'OUT' }) {
     fetchData();
   }, []);
 
+  // 入库场景：当选择物料后，若该物料已存在库存库位，则自动填充“存放位置”
+  React.useEffect(() => {
+    if (type !== 'IN' && type !== 'OUT') return;
+    let cancelled = false;
+    getInventory()
+      .then((list: any) => {
+        if (cancelled) return;
+        const byMaterial: Record<string, { location_id: number; location_name: string }[]> = {};
+        for (const row of Array.isArray(list) ? list : []) {
+          const mid = String(row.material_id);
+          const lid = Number(row.location_id);
+          const lname = String(row.location_name || '');
+          if (!mid || !Number.isFinite(lid) || !lname) continue;
+          if (!byMaterial[mid]) byMaterial[mid] = [];
+          byMaterial[mid].push({ location_id: lid, location_name: lname });
+        }
+        const chosen: Record<string, { location_id: string; location_name: string }> = {};
+        for (const [mid, arr] of Object.entries(byMaterial)) {
+          arr.sort((a, b) => a.location_name.localeCompare(b.location_name) || a.location_id - b.location_id);
+          const first = arr[0];
+          if (first) chosen[mid] = { location_id: String(first.location_id), location_name: first.location_name };
+        }
+        setMaterialDefaultLocation(chosen);
+      })
+      .catch(() => {
+        if (!cancelled) setMaterialDefaultLocation({});
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [type]);
+
   // 出库时根据物料+库位获取当前库存
   React.useEffect(() => {
     if (type !== 'OUT' || !selectedIds.material || !selectedIds.location) {
@@ -148,6 +185,10 @@ export default function TransactionForm({ type }: { type: 'IN' | 'OUT' }) {
 
   // 处理输入变化，更新建议
   const handleInputChange = (field: string, value: string) => {
+    if (field === 'location' && (type === 'IN' || type === 'OUT')) {
+      if (locationAutoByMaterial != null) message.info('存放位置将被修改！');
+      setLocationAutoByMaterial(null);
+    }
     setCombinedData({...combinedData, [field]: value});
     setSelectedIds({...selectedIds, [field]: ''});
     const v = value.toLowerCase();
@@ -240,10 +281,42 @@ export default function TransactionForm({ type }: { type: 'IN' | 'OUT' }) {
 
   // 选择建议
   const selectSuggestion = (field: string, item: { id: string | number, name: string }) => {
-    setCombinedData({...combinedData, [field]: item.name});
-    setSelectedIds({...selectedIds, [field]: item.id.toString()});
-    setSuggestions({...suggestions, [field]: []});
-    setShowSuggestions({...showSuggestions, [field]: false});
+    const prevMaterialId = selectedIds.material;
+    const nextCombinedData = { ...combinedData, [field]: item.name };
+    const nextSelectedIds: typeof selectedIds = { ...selectedIds, [field]: item.id.toString() };
+
+    // 用户手动选库位：视为非自动填充
+    if ((type === 'IN' || type === 'OUT') && field === 'location') {
+      if (locationAutoByMaterial != null) message.info('存放位置将被修改！');
+      setLocationAutoByMaterial(null);
+    }
+
+    // 入库：选择物料后自动填充默认库位（若尚未填写）
+    if ((type === 'IN' || type === 'OUT') && field === 'material') {
+      const materialId = item.id.toString();
+      const def = materialDefaultLocation[materialId];
+      const prevDefault = prevMaterialId ? materialDefaultLocation[prevMaterialId]?.location_id : undefined;
+      const shouldOverride =
+        !nextSelectedIds.location ||
+        (locationAutoByMaterial != null && locationAutoByMaterial === prevMaterialId) ||
+        (prevDefault && nextSelectedIds.location === prevDefault);
+
+      if (def && shouldOverride) {
+        nextCombinedData.location = def.location_name;
+        nextSelectedIds.location = def.location_id;
+        setLocationAutoByMaterial(materialId);
+      } else {
+        // 切换物料但不覆盖库位：保持用户手动选择语义
+        setLocationAutoByMaterial(null);
+      }
+    } else if ((type === 'IN' || type === 'OUT') && field !== 'location') {
+      // 非库位操作不触碰标记
+    }
+
+    setCombinedData(nextCombinedData);
+    setSelectedIds(nextSelectedIds);
+    setSuggestions({ ...suggestions, [field]: [] });
+    setShowSuggestions({ ...showSuggestions, [field]: false });
   };
 
   const [loading, setLoading] = React.useState(false);
@@ -259,6 +332,7 @@ export default function TransactionForm({ type }: { type: 'IN' | 'OUT' }) {
     setSelectedIds({
       material: '', location: '', operator: '', department: '', recipient: '', partner: ''
     });
+    setLocationAutoByMaterial(null);
   }, []);
 
   const buildSubmitPayload = useCallback(async () => {
