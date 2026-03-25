@@ -3,7 +3,7 @@
 
 CREATE TABLE IF NOT EXISTS materials (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  code TEXT UNIQUE NOT NULL,
+  code TEXT NOT NULL DEFAULT '-',
   name TEXT NOT NULL,
   spec TEXT,
   unit TEXT,
@@ -75,7 +75,7 @@ CREATE TABLE IF NOT EXISTS role_permissions (role TEXT PRIMARY KEY, permissions 
 
 -- 初始角色权限
 INSERT OR IGNORE INTO role_permissions (role, permissions) VALUES ('admin', '["*"]');
-INSERT OR IGNORE INTO role_permissions (role, permissions) VALUES ('warehouse_keeper', '["view","inbound","outbound","edit_material","edit_settings","export"]');
+INSERT OR IGNORE INTO role_permissions (role, permissions) VALUES ('warehouse_keeper', '["view","inbound","outbound","transactions_undo","edit_material","edit_settings","export"]');
 INSERT OR IGNORE INTO role_permissions (role, permissions) VALUES ('reporter', '["view","export","backup","view_reports"]');
 INSERT OR IGNORE INTO role_permissions (role, permissions) VALUES ('readonly', '["view","view_reports"]');
 

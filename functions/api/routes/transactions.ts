@@ -120,29 +120,26 @@ export function registerTransactionRoutes(app: Hono<Env>, deps: Deps) {
         const partner_id = toInt(item?.partner_id, "partner_id", { min: 1, allowNull: true });
         const note = toOptionalTrimmedText(item?.note);
 
-        await c.env.DB.exec("BEGIN IMMEDIATE TRANSACTION");
         let txId: number | null = null;
-        try {
-          if (type === "IN") {
-            await c.env.DB.prepare("INSERT INTO inventory (material_id, location_id, quantity) VALUES (?, ?, ?) ON CONFLICT(material_id, location_id) DO UPDATE SET quantity = quantity + excluded.quantity")
-              .bind(material_id, location_id, quantity)
-              .run();
-          } else {
-            const result = await c.env.DB.prepare("UPDATE inventory SET quantity = quantity - ? WHERE material_id = ? AND location_id = ? AND quantity >= ?")
-              .bind(quantity, material_id, location_id, quantity)
-              .run();
-            if (result.meta.changes === 0) {
-              throw new Error("库存不足：当前库存可能已变化，请刷新后重试");
-            }
+        if (type === "IN") {
+          await c.env.DB.prepare("INSERT INTO inventory (material_id, location_id, quantity) VALUES (?, ?, ?) ON CONFLICT(material_id, location_id) DO UPDATE SET quantity = quantity + excluded.quantity")
+            .bind(material_id, location_id, quantity)
+            .run();
+          const insertResult = await c.env.DB.prepare("INSERT INTO transactions (type, material_id, location_id, quantity, operator_id, department_id, recipient_id, partner_id, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
+            .bind(type, material_id, location_id, quantity, operator_id ?? null, department_id ?? null, recipient_id ?? null, partner_id ?? null, note ?? null)
+            .run();
+          txId = Number(insertResult.meta.last_row_id ?? 0) || null;
+        } else {
+          const result = await c.env.DB.prepare("UPDATE inventory SET quantity = quantity - ? WHERE material_id = ? AND location_id = ? AND quantity >= ?")
+            .bind(quantity, material_id, location_id, quantity)
+            .run();
+          if (result.meta.changes === 0) {
+            throw new Error("库存不足：当前库存可能已变化，请刷新后重试");
           }
           const insertResult = await c.env.DB.prepare("INSERT INTO transactions (type, material_id, location_id, quantity, operator_id, department_id, recipient_id, partner_id, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
             .bind(type, material_id, location_id, quantity, operator_id ?? null, department_id ?? null, recipient_id ?? null, partner_id ?? null, note ?? null)
             .run();
           txId = Number(insertResult.meta.last_row_id ?? 0) || null;
-          await c.env.DB.exec("COMMIT");
-        } catch (e) {
-          await c.env.DB.exec("ROLLBACK");
-          throw e;
         }
         if (txId) ids.push(txId);
         const material = await c.env.DB.prepare("SELECT name FROM materials WHERE id = ?").bind(material_id).first<any>();
@@ -173,7 +170,6 @@ export function registerTransactionRoutes(app: Hono<Env>, deps: Deps) {
       const diff = Date.now() - new Date(row.timestamp).getTime();
       if (diff > 5 * 60 * 1000) return c.json(fail("该记录已超过 5 分钟，无法撤销", 400), 400);
       const reverseType = row.type === "IN" ? "OUT" : "IN";
-      await c.env.DB.exec("BEGIN IMMEDIATE TRANSACTION");
       const markResult = await c.env.DB.prepare("UPDATE transactions SET reverted = 1 WHERE id = ? AND (reverted IS NULL OR reverted = 0)").bind(id).run();
       if (markResult.meta.changes === 0) throw new Error("记录不存在或已撤销");
       const insertResult = await c.env.DB.prepare("INSERT INTO transactions (type, material_id, location_id, quantity, operator_id, department_id, recipient_id, partner_id, note, revert_transaction_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
@@ -193,12 +189,10 @@ export function registerTransactionRoutes(app: Hono<Env>, deps: Deps) {
           .run();
         if (deductResult.meta.changes === 0) throw new Error("撤销失败：当前库存不足，无法回滚该记录");
       }
-      await c.env.DB.exec("COMMIT");
       const material = await c.env.DB.prepare("SELECT name FROM materials WHERE id = ?").bind(row.material_id).first<any>();
       await deps.addOperationLog(c.env.DB, "REVERT_TRANSACTION", `撤销${row.type === "IN" ? "入库" : "出库"}记录#${id}：${material?.name ?? "未知"}`, user.displayName || user.username, { clientIp: deps.getClientIp(c) });
       return c.json({ success: true });
     } catch (err: any) {
-      try { await c.env.DB.exec("ROLLBACK"); } catch {}
       return c.json(fail(err?.message ?? "撤销失败", 400), 400);
     }
   });

@@ -42,6 +42,20 @@ const MIGRATIONS: Migration[] = [
       await db.prepare("CREATE INDEX IF NOT EXISTS idx_operation_logs_action_created_at ON operation_logs(action, created_at DESC)").run();
     },
   },
+  {
+    id: 4,
+    name: "materials_code_no_unique_default_dash",
+    up: async (db) => {
+      await db.prepare(
+        "CREATE TABLE IF NOT EXISTS materials_new (id INTEGER PRIMARY KEY AUTOINCREMENT, code TEXT NOT NULL DEFAULT '-', name TEXT NOT NULL, spec TEXT, unit TEXT, category_id INTEGER, image_url TEXT, source TEXT, purchase_price REAL, sale_price REAL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)"
+      ).run();
+      await db.prepare(
+        "INSERT INTO materials_new (id, code, name, spec, unit, category_id, image_url, source, purchase_price, sale_price, created_at) SELECT id, CASE WHEN code IS NULL OR trim(code) = '' THEN '-' ELSE code END, name, spec, unit, category_id, image_url, source, purchase_price, sale_price, created_at FROM materials"
+      ).run();
+      await db.prepare("DROP TABLE materials").run();
+      await db.prepare("ALTER TABLE materials_new RENAME TO materials").run();
+    },
+  },
 ];
 
 const TABLE_NAME = "schema_migrations";

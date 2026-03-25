@@ -140,6 +140,7 @@ export function registerMaterialsRoutes(app: Hono<Env>, deps: Deps) {
     const exclude_id = url.searchParams.get("exclude_id");
     if (!code || !String(code).trim()) return c.json({ available: true });
     const c2 = String(code).trim();
+    if (c2 === "-") return c.json({ available: true });
     if (c2.length > 64) return c.json({ available: false, error: "编码过长" });
     const excludeId = exclude_id ? parseInt(String(exclude_id), 10) : null;
     let row: { id: number } | null = null;
@@ -239,16 +240,14 @@ export function registerMaterialsRoutes(app: Hono<Env>, deps: Deps) {
       const cleanPurchase = deps.cleanOptionalNonNegativeNumber(body?.purchase_price);
       const cleanSale = deps.cleanOptionalNonNegativeNumber(body?.sale_price);
       const cleanImageUrl = deps.cleanOptionalText(body?.image_url, "image_url", 300);
-      const finalCode =
-        cleanCode ||
-        `M-${Date.now().toString(36).toUpperCase()}${Math.floor(Math.random() * 1000)
-          .toString()
-          .padStart(3, "0")}`;
-      const existing = await c.env.DB
-        .prepare("SELECT id FROM materials WHERE code = ?")
-        .bind(finalCode)
-        .first<{ id: number }>();
-      if (existing) throw new Error(`物料编码「${finalCode}」已存在`);
+      const finalCode = cleanCode || "-";
+      if (finalCode !== "-") {
+        const existing = await c.env.DB
+          .prepare("SELECT id FROM materials WHERE code = ?")
+          .bind(finalCode)
+          .first<{ id: number }>();
+        if (existing) throw new Error(`物料编码「${finalCode}」已存在`);
+      }
       const r = await c.env.DB.prepare(
         "INSERT INTO materials (code, name, spec, unit, category_id, image_url, source, purchase_price, sale_price) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
       )
@@ -293,7 +292,8 @@ export function registerMaterialsRoutes(app: Hono<Env>, deps: Deps) {
       image_url?: string;
     }>();
     try {
-      const cleanCode = deps.cleanRequiredText(body?.code, "code", 64);
+      const cleanCode = deps.cleanOptionalText(body?.code, "code", 64);
+      const finalCode = cleanCode || "-";
       const cleanName = deps.cleanRequiredText(body?.name, "name", 120);
       const cleanSpec = deps.cleanOptionalText(body?.spec, "spec", 200);
       const cleanUnit = deps.cleanOptionalText(body?.unit, "unit", 50);
@@ -302,11 +302,13 @@ export function registerMaterialsRoutes(app: Hono<Env>, deps: Deps) {
       const cleanPurchase = deps.cleanOptionalNonNegativeNumber(body?.purchase_price);
       const cleanSale = deps.cleanOptionalNonNegativeNumber(body?.sale_price);
       const cleanImageUrl = deps.cleanOptionalText(body?.image_url, "image_url", 300);
-      const existing = await c.env.DB
-        .prepare("SELECT id FROM materials WHERE code = ? AND id != ?")
-        .bind(cleanCode, id)
-        .first<{ id: number }>();
-      if (existing) throw new Error(`物料编码「${cleanCode}」已被其他物料使用`);
+      if (finalCode !== "-") {
+        const existing = await c.env.DB
+          .prepare("SELECT id FROM materials WHERE code = ? AND id != ?")
+          .bind(finalCode, id)
+          .first<{ id: number }>();
+        if (existing) throw new Error(`物料编码「${finalCode}」已被其他物料使用`);
+      }
       const old = await c.env.DB
         .prepare("SELECT code, name, spec, unit, category_id, source, purchase_price, sale_price FROM materials WHERE id = ?")
         .bind(id)
@@ -315,7 +317,7 @@ export function registerMaterialsRoutes(app: Hono<Env>, deps: Deps) {
         "UPDATE materials SET code = ?, name = ?, spec = ?, unit = ?, category_id = ?, image_url = ?, source = ?, purchase_price = ?, sale_price = ? WHERE id = ?"
       )
         .bind(
-          cleanCode,
+          finalCode,
           cleanName,
           cleanSpec,
           cleanUnit,
@@ -335,7 +337,7 @@ export function registerMaterialsRoutes(app: Hono<Env>, deps: Deps) {
         {
           oldValue: old ? JSON.stringify(old) : "",
           newValue: JSON.stringify({
-            code: cleanCode,
+            code: finalCode,
             name: cleanName,
             spec: cleanSpec,
             unit: cleanUnit,
@@ -493,16 +495,14 @@ export function registerMaterialsRoutes(app: Hono<Env>, deps: Deps) {
         const cleanPurchase = deps.cleanOptionalNonNegativeNumber(item?.purchase_price);
         const cleanSale = deps.cleanOptionalNonNegativeNumber(item?.sale_price);
         const cleanImageUrl = deps.cleanOptionalText(item?.image_url, "image_url", 300);
-        const finalCode =
-          cleanCode ||
-          `M-${Date.now().toString(36).toUpperCase()}${Math.floor(Math.random() * 1000)
-            .toString()
-            .padStart(3, "0")}`;
-        const existsCode = await c.env.DB
-          .prepare("SELECT id FROM materials WHERE code = ?")
-          .bind(finalCode)
-          .first<{ id: number }>();
-        if (existsCode) throw new Error(`编码「${finalCode}」已存在`);
+        const finalCode = cleanCode || "-";
+        if (finalCode !== "-") {
+          const existsCode = await c.env.DB
+            .prepare("SELECT id FROM materials WHERE code = ?")
+            .bind(finalCode)
+            .first<{ id: number }>();
+          if (existsCode) throw new Error(`编码「${finalCode}」已存在`);
+        }
         await c.env.DB.prepare(
           "INSERT INTO materials (code, name, spec, unit, category_id, image_url, source, purchase_price, sale_price) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
         )
