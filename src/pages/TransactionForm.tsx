@@ -60,8 +60,7 @@ export default function TransactionForm({ type }: { type: 'IN' | 'OUT' }) {
     partner: ''
   });
 
-  // 仅用于 IN 场景：标记当前“存放位置”是否由上一次选择物料自动填充。
-  // 用户手动修改库位后会清除标记；切换物料时如果仍是自动填充，则会联动覆盖为新物料的默认库位。
+
   const [locationAutoByMaterial, setLocationAutoByMaterial] = React.useState<string | null>(null);
 
   type SuggestionItem = { id: number; name: string };
@@ -280,8 +279,7 @@ export default function TransactionForm({ type }: { type: 'IN' | 'OUT' }) {
   };
 
   // 选择建议
-  const selectSuggestion = (field: string, item: { id: string | number, name: string }) => {
-    const prevMaterialId = selectedIds.material;
+  const selectSuggestion = async (field: string, item: { id: string | number; name: string }) => {
     const nextCombinedData = { ...combinedData, [field]: item.name };
     const nextSelectedIds: typeof selectedIds = { ...selectedIds, [field]: item.id.toString() };
 
@@ -291,22 +289,43 @@ export default function TransactionForm({ type }: { type: 'IN' | 'OUT' }) {
       setLocationAutoByMaterial(null);
     }
 
-    // 入库：选择物料后自动填充默认库位（若尚未填写）
+    // 入库/出库：选择物料后自动填充该物料的默认库位
     if ((type === 'IN' || type === 'OUT') && field === 'material') {
       const materialId = item.id.toString();
-      const def = materialDefaultLocation[materialId];
-      const prevDefault = prevMaterialId ? materialDefaultLocation[prevMaterialId]?.location_id : undefined;
-      const shouldOverride =
-        !nextSelectedIds.location ||
-        (locationAutoByMaterial != null && locationAutoByMaterial === prevMaterialId) ||
-        (prevDefault && nextSelectedIds.location === prevDefault);
+      let def = materialDefaultLocation[materialId];
 
-      if (def && shouldOverride) {
+      // 兜底：当默认库位 map 里没有（可能是 getInventory 计算还没完成/时序问题），即时补算
+      if (!def) {
+        try {
+          const list: any = await getInventory();
+          const rows = (Array.isArray(list) ? list : [])
+            .filter(
+              (r) =>
+                String(r.material_id) === materialId &&
+                Number.isFinite(Number(r.location_id)) &&
+                String(r.location_name || '').trim() !== ''
+            )
+            .map((r) => ({
+              location_id: Number(r.location_id),
+              location_name: String(r.location_name),
+            }))
+            .sort((a, b) => a.location_name.localeCompare(b.location_name) || a.location_id - b.location_id);
+          const first = rows[0];
+          if (first) def = { location_id: String(first.location_id), location_name: first.location_name };
+        } catch {
+          // ignore：不影响手动输入
+        }
+      }
+
+      // 每次选择物料时，如果有默认库位则自动填充
+      if (def) {
         nextCombinedData.location = def.location_name;
         nextSelectedIds.location = def.location_id;
         setLocationAutoByMaterial(materialId);
       } else {
-        // 切换物料但不覆盖库位：保持用户手动选择语义
+        // 该物料没有库存记录，清空库位让用户手动选择
+        nextCombinedData.location = '';
+        nextSelectedIds.location = '';
         setLocationAutoByMaterial(null);
       }
     } else if ((type === 'IN' || type === 'OUT') && field !== 'location') {
